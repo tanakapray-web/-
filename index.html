@@ -119,14 +119,13 @@ tbody td{padding:10px 12px;color:var(--text);}
 .totals-bar span{font-size:13px;font-weight:600;}
 .totals-bar .lbl{font-size:12px;color:var(--text2);font-weight:400;}
 .auto-badge{display:inline-block;background:rgba(52,211,153,.12);color:var(--green);font-size:10px;padding:1px 7px;border-radius:20px;border:1px solid rgba(52,211,153,.25);margin-left:6px;vertical-align:middle;}
-/* SALES LIST GROUPED */
+.sched-badge{display:inline-block;background:rgba(124,92,252,.12);color:var(--accent2);font-size:10px;padding:1px 7px;border-radius:20px;border:1px solid rgba(124,92,252,.25);margin-left:6px;vertical-align:middle;}
 .sales-grand{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px 24px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;}
 .sales-grand-val{font-family:'DM Mono',monospace;font-size:34px;font-weight:700;}
 .sales-group{margin-bottom:20px;border:1px solid var(--border);border-radius:10px;overflow:hidden;}
 .sales-group-hd{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg3);}
 .sales-group-title{font-size:12px;font-weight:600;}
 .sales-group-total{font-family:'DM Mono',monospace;font-size:13px;font-weight:600;}
-/* EXPORT */
 .export-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px 22px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:16px;}
 .export-info .export-title{font-size:14px;font-weight:600;margin-bottom:3px;}
 .export-info .export-desc{font-size:12px;color:var(--text2);}
@@ -139,6 +138,9 @@ tbody td{padding:10px 12px;color:var(--text);}
 .tag{display:inline-flex;align-items:center;gap:4px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;}
 .tag-del{background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;line-height:1;padding:0 2px;}
 .tag-add-row{display:flex;gap:8px;}
+.sched-import-bar{background:rgba(124,92,252,.08);border:1px solid rgba(124,92,252,.25);border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.sched-import-info{font-size:13px;color:var(--accent2);}
+.sched-import-count{font-size:12px;color:var(--text2);margin-top:2px;}
 @media print{body{background:#fff!important;color:#000!important;}.sidebar,.topbar,.btn,.modal-close,.no-print,#toast{display:none!important;}.main{margin-left:0!important;}.modal-overlay{display:block!important;position:static!important;background:#fff!important;}.modal{border:none!important;background:#fff!important;color:#000!important;max-height:none!important;width:100%!important;padding:0!important;}.print-area *{color:#000!important;background:#fff!important;border-color:#ccc!important;}}
 </style>
 </head>
@@ -191,14 +193,14 @@ tbody td{padding:10px 12px;color:var(--text);}
       <div class="card"><div class="card-header"><div class="card-title">最近の日報</div><div class="card-action" onclick="showPage('daily-list')">すべて見る →</div></div><table><thead><tr><th>日付</th><th>店舗</th><th>作成者</th><th>件数</th><th>売上計</th><th>天候</th></tr></thead><tbody id="dash-recent-daily"></tbody></table></div>
     </div>
 
-    <!-- DAILY REPORT 統合 -->
+    <!-- DAILY REPORT -->
     <div class="page" id="page-daily">
       <div class="page-header"><h1>デイリーレポート入力</h1><p>サービス実績・売上・ST取引・パート管理を一括入力</p></div>
       <div class="card">
         <div class="form-section">
           <div class="form-section-title">基本情報</div>
           <div class="form-grid">
-            <div class="form-group"><label class="form-label">日付 *</label><input type="date" class="form-input" id="d-date"></div>
+            <div class="form-group"><label class="form-label">日付 *</label><input type="date" class="form-input" id="d-date" onchange="loadScheduleForDate()"></div>
             <div class="form-group"><label class="form-label">作成者</label><input type="text" class="form-input" id="d-author" readonly></div>
             <div class="form-group"><label class="form-label">店舗</label><input type="text" class="form-input" id="d-store" readonly></div>
             <div class="form-group"><label class="form-label">天候</label><select class="form-select" id="d-weather"><option value="晴れ">☀️ 晴れ</option><option value="曇り">☁️ 曇り</option><option value="雨">🌧 雨</option><option value="雪">❄️ 雪</option></select></div>
@@ -206,7 +208,15 @@ tbody td{padding:10px 12px;color:var(--text);}
         </div>
 
         <div class="form-section">
-          <div class="form-section-title">サービス実績・売上明細</div>
+          <div class="form-section-title">サービス実績・売上明細 <span class="sched-badge">スケジュールから自動読込</span></div>
+          <!-- スケジュール読込バー -->
+          <div id="sched-import-bar" class="sched-import-bar" style="display:none;">
+            <div>
+              <div class="sched-import-info">📅 スケジュールデータが見つかりました</div>
+              <div class="sched-import-count" id="sched-import-count"></div>
+            </div>
+            <button class="btn btn-success btn-sm" onclick="importFromSchedule()">↓ 読み込む</button>
+          </div>
           <div style="overflow-x:auto;">
             <table class="itbl"><thead><tr>
               <th style="width:26px">#</th><th style="min-width:100px">顧客名</th><th style="width:60px">開始</th><th style="width:60px">終了</th><th style="width:46px">実働h</th><th style="width:36px">社員</th><th style="width:36px">PA</th><th style="width:80px">区分</th><th style="min-width:90px">サービス内容</th><th style="width:36px">完了</th><th style="width:84px">売上(税抜)</th><th style="width:84px">入金(税込)</th><th style="width:84px">売掛(税込)</th><th style="width:84px">その他売上</th><th style="width:84px">商品売上</th><th style="min-width:100px">スポット経路</th><th style="width:28px"></th>
@@ -403,7 +413,6 @@ tbody td{padding:10px 12px;color:var(--text);}
 <div id="toast">✓ 保存しました</div>
 
 <script>
-// ===== SUPABASE 設定 =====
 const SUPABASE_URL='https://nxaepscqkxpldvunbhri.supabase.co';
 const SUPABASE_KEY='sb_publishable_9sDcDJjq0wCdAP_9AkEXeQ_tvectEFa';
 
@@ -412,8 +421,7 @@ async function sbFetch(path,method='GET',body=null){
   if(body)opts.body=JSON.stringify(body);
   const res=await fetch(SUPABASE_URL+'/rest/v1/'+path,opts);
   if(!res.ok){const e=await res.text();console.error('Supabase error:',e);return null;}
-  const text=await res.text();
-  return text?JSON.parse(text):null;
+  const text=await res.text();return text?JSON.parse(text):null;
 }
 async function sbGet(table,query=''){return await sbFetch(table+'?'+query);}
 async function sbInsert(table,data){return await sbFetch(table,'POST',data);}
@@ -426,13 +434,12 @@ async function sbUpsert(table,data){
   const text=await res.text();return text?JSON.parse(text):null;
 }
 
-// ===== ローカルキャッシュ =====
 const DEF_CATS=['定期','スポット','新スポット','その他','商品'];
 const DEF_ROUTES=['DH','コールセンター','リピート','リコール','他部署紹介','他店紹介','お客様紹介','クレアス','ポスティング','DM','HP','その他','穴吹','湖光'];
 let db={stores:[],users:[],daily:[],monthly:[],cats:{service:[...DEF_CATS],route:[...DEF_ROUTES]}};
 let currentUser=null,activeStoreFilter='all';
+let pendingSchedules=[]; // スケジュールから読み込んだデータ一時保存
 
-// ===== 初期データ読み込み =====
 async function loadDB(){
   showLoading(true);
   try{
@@ -446,9 +453,8 @@ async function loadDB(){
     db.stores=stores||[];
     db.users=users||[];
     db.daily=(daily||[]).map(d=>({...d,serviceRows:d.service_rows||[],stRows:d.st_rows||[],partRows:d.part_rows||[],storeId:d.store_id,createdAt:d.created_at}));
-    db.monthly=(monthly||[]).map(m=>({...m,storeId:m.store_id,reportDate:m.report_date,budget:m.budget,actual:m.actual,lastyear:m.lastyear,count:m.count,part:m.part,zatsuRate:m.zatsu_rate,newContract:m.new_contract,newContractAmt:m.new_contract_amt,referralRcv:m.referral_rcv,done:m.done,issue:m.issue,next:m.next}));
+    db.monthly=(monthly||[]).map(m=>({...m,storeId:m.store_id,reportDate:m.report_date,zatsuRate:m.zatsu_rate,newContract:m.new_contract,newContractAmt:m.new_contract_amt,referralRcv:m.referral_rcv}));
     if(cats&&cats[0]){db.cats={service:cats[0].service||DEF_CATS,route:cats[0].route||DEF_ROUTES};}
-    // 初回：データがなければ初期データを作成
     if(!db.stores.length){
       await sbInsert('stores',{id:'s1',name:'プレイ平店',dept:'サービスマスター事業部',created_at:today()});
       await sbInsert('users',{id:'a1',name:'管理者',login_id:'admin',pw:'admin123',store_id:'s1',dept:'管理部',position:'管理者',role:'admin',created_at:today()});
@@ -459,12 +465,7 @@ async function loadDB(){
   showLoading(false);
 }
 
-function showLoading(show){
-  let el=document.getElementById('loading-overlay');
-  if(!el){el=document.createElement('div');el.id='loading-overlay';el.style.cssText='position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:9999;font-size:14px;color:var(--text2);';el.innerHTML='<div style="text-align:center"><div style="font-size:28px;margin-bottom:12px;">⏳</div>読み込み中...</div>';document.body.appendChild(el);}
-  el.style.display=show?'flex':'none';
-}
-
+function showLoading(show){let el=document.getElementById('loading-overlay');if(!el){el=document.createElement('div');el.id='loading-overlay';el.style.cssText='position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:9999;font-size:14px;color:var(--text2);';el.innerHTML='<div style="text-align:center"><div style="font-size:28px;margin-bottom:12px;">⏳</div>読み込み中...</div>';document.body.appendChild(el);}el.style.display=show?'flex':'none';}
 function today(){return new Date().toISOString().split('T')[0];}
 function thisMonth(){return new Date().toISOString().slice(0,7);}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
@@ -489,28 +490,16 @@ function doLogout(){currentUser=null;sessionStorage.removeItem('ds');document.ge
 async function tryRestore(){const sid=sessionStorage.getItem('ds');if(!sid)return false;await loadDB();const u=db.users.find(u=>(u.login_id||u.loginId)===sid);if(!u)return false;currentUser={...u,loginId:u.login_id||u.loginId,storeId:u.store_id||u.storeId};return true;}
 
 function startApp(){
-  document.getElementById('login-screen').style.display='none';
-  document.getElementById('app').style.display='block';
+  document.getElementById('login-screen').style.display='none';document.getElementById('app').style.display='block';
   const st=gs(currentUser.storeId);
-  document.getElementById('sb-store-name').textContent=st.name;
-  document.getElementById('sb-name').textContent=currentUser.name;
-  document.getElementById('sb-role').textContent=RL[currentUser.role]||currentUser.role;
-  document.getElementById('sb-avatar').textContent=currentUser.name.slice(0,1);
+  document.getElementById('sb-store-name').textContent=st.name;document.getElementById('sb-name').textContent=currentUser.name;
+  document.getElementById('sb-role').textContent=RL[currentUser.role]||currentUser.role;document.getElementById('sb-avatar').textContent=currentUser.name.slice(0,1);
   document.getElementById('topbar-date').textContent=new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
   buildSidebar();buildStoreFilter();
-  document.getElementById('filter-month').value=thisMonth();
-  document.getElementById('filter-daily-month').value=thisMonth();
-  document.getElementById('admin-filter-month').value=thisMonth();
+  document.getElementById('filter-month').value=thisMonth();document.getElementById('filter-daily-month').value=thisMonth();document.getElementById('admin-filter-month').value=thisMonth();
   showPage('dashboard');
 }
-function buildSidebar(){
-  const r=currentUser.role;let h='';
-  h+=`<div class="nav-label">メイン</div>${ni('dashboard','📊','ダッシュボード')}`;
-  h+=`<div class="nav-label">入力</div>${ni('daily','📝','デイリーレポート')}`;
-  if(r!=='general'){h+=ni('monthly-report','📋','月間運営報告');h+=`<div class="nav-label">閲覧</div>${ni('sales-list','📈','売上一覧')}${ni('daily-list','🗂️','日報一覧')}${ni('monthly-list','📑','月間報告一覧')}`;h+=`<div class="nav-label">ツール</div>${ni('export','⬇️','エクスポート')}`;}
-  if(r==='admin')h+=`<div class="nav-label">管理者</div>${ni('admin-stores','🏢','店舗管理')}${ni('admin-users','👥','アカウント管理')}${ni('admin-sales','📊','全店舗 売上')}${ni('admin-settings','⚙️','マスタ設定')}`;
-  document.getElementById('sidebar-nav').innerHTML=h;
-}
+function buildSidebar(){const r=currentUser.role;let h='';h+=`<div class="nav-label">メイン</div>${ni('dashboard','📊','ダッシュボード')}`;h+=`<div class="nav-label">入力</div>${ni('daily','📝','デイリーレポート')}`;if(r!=='general'){h+=ni('monthly-report','📋','月間運営報告');h+=`<div class="nav-label">閲覧</div>${ni('sales-list','📈','売上一覧')}${ni('daily-list','🗂️','日報一覧')}${ni('monthly-list','📑','月間報告一覧')}`;h+=`<div class="nav-label">ツール</div>${ni('export','⬇️','エクスポート')}`;}if(r==='admin')h+=`<div class="nav-label">管理者</div>${ni('admin-stores','🏢','店舗管理')}${ni('admin-users','👥','アカウント管理')}${ni('admin-sales','📊','全店舗 売上')}${ni('admin-settings','⚙️','マスタ設定')}`;document.getElementById('sidebar-nav').innerHTML=h;}
 function ni(id,icon,label){return`<div class="nav-item" id="nav-${id}" onclick="showPage('${id}')"><span class="nav-icon">${icon}</span>${label}</div>`;}
 function buildStoreFilter(){if(currentUser.role!=='admin'){document.getElementById('store-filter-wrap').style.display='none';return;}document.getElementById('store-filter-wrap').style.display='flex';document.getElementById('global-store-filter').innerHTML='<option value="all">全店舗</option>'+db.stores.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');}
 function onStoreFilterChange(){activeStoreFilter=document.getElementById('global-store-filter').value;renderDashboard();}
@@ -519,10 +508,8 @@ function showPage(id){
   const r=currentUser.role;
   if(['monthly-report','sales-list','daily-list','monthly-list','export'].includes(id)&&r==='general')return;
   if(['admin-stores','admin-users','admin-sales','admin-settings'].includes(id)&&r!=='admin')return;
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-  const pg=document.getElementById('page-'+id);if(pg)pg.classList.add('active');
-  const nv=document.getElementById('nav-'+id);if(nv)nv.classList.add('active');
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const pg=document.getElementById('page-'+id);if(pg)pg.classList.add('active');const nv=document.getElementById('nav-'+id);if(nv)nv.classList.add('active');
   document.getElementById('topbar-title').textContent=PT[id]||id;
   if(id==='dashboard')renderDashboard();else if(id==='daily')initDailyForm();else if(id==='monthly-report')initMonthlyForm();else if(id==='sales-list')renderSalesList();else if(id==='daily-list')renderDailyList();else if(id==='monthly-list')renderMonthlyList();else if(id==='export')initExportPage();else if(id==='admin-stores')renderStores();else if(id==='admin-users')renderUsers();else if(id==='admin-sales')renderAdminSales();else if(id==='admin-settings')renderSettings();
 }
@@ -534,7 +521,7 @@ function partCost(d){return(d.partRows||[]).reduce((a,r)=>a+(Number(r.daily)||0)
 function partCnt(d){return(d.partRows||[]).filter(r=>r.name).length;}
 function dSalesByType(d){const m={};(d.serviceRows||[]).forEach(r=>{const t=r.type||'その他';m[t]=(m[t]||0)+(Number(r.amount)||0);if(Number(r.otherSales)>0)m['その他売上']=(m['その他売上']||0)+(Number(r.otherSales)||0);if(Number(r.goodsSales)>0)m['商品売上']=(m['商品売上']||0)+(Number(r.goodsSales)||0);});return m;}
 
-// DASHBOARD
+// ===== DASHBOARD =====
 function renderDashboard(){
   const m=thisMonth(),dailies=fbStore(db.daily).filter(d=>(d.date||'').startsWith(m));
   let total=0,cnt=0;const byT={};
@@ -543,31 +530,109 @@ function renderDashboard(){
   const mr=fbStore(db.monthly).find(x=>x.month===m);
   const budget=mr?Number(mr.budget)||0:0,rate=budget>0?total/budget:0,up=cnt>0?Math.round(total/cnt):0;
   document.getElementById('kpi-sales').textContent=fy(total);document.getElementById('kpi-count').textContent=cnt+'件';document.getElementById('kpi-unit').textContent='客単価 '+fy(up);document.getElementById('kpi-daily').textContent=dailies.length+'件';document.getElementById('kpi-total').textContent=fy(cum);document.getElementById('kpi-rate').textContent=budget>0?'予算比 '+(rate*100).toFixed(1)+'%':'予算未設定';
-  const cats=db.cats.service||DEF_CATS;const col=Math.min(cats.length,4);
-  const g=document.getElementById('dash-breakdown-grid');g.style.gridTemplateColumns=`repeat(${col},1fr)`;
-  g.innerHTML=cats.map(c=>`<div class="summary-item"><div class="summary-key">${c}</div><div class="summary-val">${fy(byT[c]||0)}</div></div>`).join('');
+  const cats=db.cats.service||DEF_CATS;const col=Math.min(cats.length,4);const g=document.getElementById('dash-breakdown-grid');g.style.gridTemplateColumns=`repeat(${col},1fr)`;g.innerHTML=cats.map(c=>`<div class="summary-item"><div class="summary-key">${c}</div><div class="summary-val">${fy(byT[c]||0)}</div></div>`).join('');
   const pct=budget>0?Math.min(rate*100,100):0;document.getElementById('dash-progress').style.width=pct+'%';document.getElementById('dash-rate-text').textContent=budget>0?pct.toFixed(1)+'%':'—';
   const months=[];for(let i=5;i>=0;i--){const d=new Date();d.setMonth(d.getMonth()-i);months.push(d.toISOString().slice(0,7));}
-  const mT=months.map(mo=>fbStore(db.daily).filter(d=>(d.date||'').startsWith(mo)).reduce((a,d)=>a+dTotal(d),0));
-  const mx=Math.max(...mT,1);
+  const mT=months.map(mo=>fbStore(db.daily).filter(d=>(d.date||'').startsWith(mo)).reduce((a,d)=>a+dTotal(d),0));const mx=Math.max(...mT,1);
   document.getElementById('chart-bars').innerHTML=months.map((mo,i)=>{const h=Math.round(mT[i]/mx*100),v=mT[i]>=10000?Math.round(mT[i]/10000)+'万':String(mT[i]);return`<div class="bar-wrap"><div class="bar-value">${v}</div><div class="bar" style="height:${h}px"></div><div class="bar-label">${mo.slice(5)}月</div></div>`;}).join('');
-  const rec=[...fbStore(db.daily)].sort((a,b)=>b.date>a.date?1:-1).slice(0,5);
-  const wi={'晴れ':'☀️','曇り':'☁️','雨':'🌧','雪':'❄️'};
+  const rec=[...fbStore(db.daily)].sort((a,b)=>b.date>a.date?1:-1).slice(0,5);const wi={'晴れ':'☀️','曇り':'☁️','雨':'🌧','雪':'❄️'};
   document.getElementById('dash-recent-daily').innerHTML=rec.length===0?'<tr><td colspan="6" style="color:var(--text2);text-align:center;padding:20px;">日報がありません</td></tr>':rec.map(d=>`<tr><td>${d.date}</td><td class="td-sub">${gs(d.storeId).name}</td><td>${d.author||'—'}</td><td class="td-mono">${(d.serviceRows||[]).filter(r=>r.name).length}件</td><td class="td-mono">${fy(dTotal(d))}</td><td>${(wi[d.weather]||'')+' '+(d.weather||'')}</td></tr>`).join('');
 }
 
-// DAILY FORM
+// ===== DAILY FORM =====
 let rC=0,stC=0,pC=0;
-function sOpts(){return db.cats.service.map(c=>`<option value="${c}">${c}</option>`).join('');}
-function rtOpts(){return'<option value="">—</option>'+db.cats.route.map(r=>`<option value="${r}">${r}</option>`).join('');}
+function sOpts(sel){return db.cats.service.map(c=>`<option value="${c}"${c===sel?' selected':''}>${c}</option>`).join('');}
+function rtOpts(sel){return'<option value="">—</option>'+db.cats.route.map(r=>`<option value="${r}"${r===sel?' selected':''}>${r}</option>`).join('');}
+
 function initDailyForm(){
   if(!document.getElementById('d-date').value)document.getElementById('d-date').value=today();
-  document.getElementById('d-author').value=currentUser.name;document.getElementById('d-store').value=gs(currentUser.storeId).name;
+  document.getElementById('d-author').value=currentUser.name;
+  document.getElementById('d-store').value=gs(currentUser.storeId).name;
   if(!document.getElementById('service-tbody').children.length){addServiceRow();addServiceRow();addServiceRow();}
   if(!document.getElementById('st-tbody').children.length)addSTRow();
   if(!document.getElementById('part-tbody').children.length)addPartRow();
   updSales();
+  // 日付が入ってたらスケジュール確認
+  const date=document.getElementById('d-date').value;
+  if(date)loadScheduleForDate();
 }
+
+// ===== スケジュール自動読込 =====
+async function loadScheduleForDate(){
+  const date=document.getElementById('d-date').value;
+  if(!date){document.getElementById('sched-import-bar').style.display='none';return;}
+
+  // 現在のユーザーの店舗IDに紐づくスケジュールを取得
+  const storeId=currentUser.storeId;
+  const res=await sbGet('schedules',`date=eq.${date}&store_id=eq.${storeId}&select=*&order=start_time`);
+
+  if(!res||!res.length){
+    // 店舗指定がないスケジュールも探す（store_idがnullのもの）
+    const res2=await sbGet('schedules',`date=eq.${date}&store_id=is.null&select=*&order=start_time`);
+    if(!res2||!res2.length){document.getElementById('sched-import-bar').style.display='none';return;}
+    pendingSchedules=res2;
+  }else{
+    pendingSchedules=res;
+  }
+
+  // 休みなどを除外（nameが「休み」「×」のもの）
+  pendingSchedules=pendingSchedules.filter(s=>s.name&&!['休み','×','ＰＭ休み'].includes(s.name));
+
+  if(!pendingSchedules.length){document.getElementById('sched-import-bar').style.display='none';return;}
+
+  document.getElementById('sched-import-count').textContent=`${pendingSchedules.length}件の現場予定が見つかりました`;
+  document.getElementById('sched-import-bar').style.display='flex';
+}
+
+function importFromSchedule(){
+  if(!pendingSchedules.length)return;
+  // 既存の空行を削除
+  const tbody=document.getElementById('service-tbody');
+  const existingRows=[...tbody.querySelectorAll('tr')];
+  existingRows.forEach(tr=>{const inp=tr.querySelectorAll('input');if(inp[0]&&!inp[0].value.trim())tr.remove();});
+
+  pendingSchedules.forEach(s=>{
+    addServiceRowWithData({
+      name: s.name||'',
+      startTime: s.start_time||'',
+      endTime: s.end_time||'',
+      type: s.category||'',
+      route: s.route||'',
+      amount: s.amount||0,
+    });
+  });
+
+  document.getElementById('sched-import-bar').style.display='none';
+  updSales();
+  toast(`${pendingSchedules.length}件のスケジュールを読み込みました`);
+  pendingSchedules=[];
+}
+
+function addServiceRowWithData(data){
+  rC++;
+  const tr=document.createElement('tr');
+  const startVal=data.startTime||'';
+  const endVal=data.endTime||'';
+  tr.innerHTML=`<td style="text-align:center;color:var(--text2);font-size:11px;">${rC}</td>
+    <td><input type="text" value="${data.name||''}" placeholder="顧客名" oninput="updSales()"></td>
+    <td><input type="time" value="${startVal}"></td>
+    <td><input type="time" value="${endVal}"></td>
+    <td><input type="number" min="0" step="0.5" style="width:40px;" oninput="updSales()"></td>
+    <td><input type="number" min="0" style="width:32px;"></td>
+    <td><input type="number" min="0" style="width:32px;"></td>
+    <td><select oninput="updSales()">${sOpts(data.type||'')}</select></td>
+    <td><input type="text" placeholder="内容" style="min-width:80px;"></td>
+    <td><select><option>合</option><option>否</option></select></td>
+    <td><input type="number" min="0" value="${data.amount||''}" oninput="updSales()"></td>
+    <td><input type="number" min="0"></td>
+    <td><input type="number" min="0"></td>
+    <td><input type="number" min="0" placeholder="0" oninput="updSales()"></td>
+    <td><input type="number" min="0" placeholder="0" oninput="updSales()"></td>
+    <td><select>${rtOpts(data.route||'')}</select></td>
+    <td><button class="del-btn" onclick="this.closest('tr').remove();updSales()">✕</button></td>`;
+  document.getElementById('service-tbody').appendChild(tr);
+}
+
 function addServiceRow(){rC++;const tr=document.createElement('tr');tr.innerHTML=`<td style="text-align:center;color:var(--text2);font-size:11px;">${rC}</td><td><input type="text" placeholder="顧客名" oninput="updSales()"></td><td><input type="time"></td><td><input type="time"></td><td><input type="number" min="0" step="0.5" style="width:40px;" oninput="updSales()"></td><td><input type="number" min="0" style="width:32px;"></td><td><input type="number" min="0" style="width:32px;"></td><td><select oninput="updSales()">${sOpts()}</select></td><td><input type="text" placeholder="内容" style="min-width:80px;"></td><td><select><option>合</option><option>否</option></select></td><td><input type="number" min="0" oninput="updSales()"></td><td><input type="number" min="0"></td><td><input type="number" min="0"></td><td><input type="number" min="0" placeholder="0" oninput="updSales()"></td><td><input type="number" min="0" placeholder="0" oninput="updSales()"></td><td><select>${rtOpts()}</select></td><td><button class="del-btn" onclick="this.closest('tr').remove();updSales()">✕</button></td>`;document.getElementById('service-tbody').appendChild(tr);}
 function addSTRow(){stC++;const tr=document.createElement('tr');tr.innerHTML=`<td style="text-align:center;color:var(--text2);font-size:11px;">${stC}</td><td><input type="text" placeholder="ST名・会社名"></td><td><input type="text" placeholder="作業内容"></td><td><input type="time"></td><td><input type="time"></td><td><input type="number" min="0" step="0.5" style="width:40px;"></td><td><input type="number" min="0" placeholder="0" oninput="updST()"></td><td><input type="number" min="0" placeholder="0" oninput="updST()"></td><td><input type="text" placeholder="備考"></td><td><button class="del-btn" onclick="this.closest('tr').remove();updST()">✕</button></td>`;document.getElementById('st-tbody').appendChild(tr);}
 function addPartRow(){pC++;const tr=document.createElement('tr');tr.innerHTML=`<td style="text-align:center;color:var(--text2);font-size:11px;">${pC}</td><td><input type="text" placeholder="氏名" oninput="updPart()"></td><td><input type="text" placeholder="顧客先（現場）"></td><td><input type="time"></td><td><input type="time"></td><td><input type="number" min="0" step="0.5" style="width:40px;"></td><td><input type="number" min="0" placeholder="0" oninput="updPart()"></td><td><input type="number" min="0" placeholder="0" oninput="updPart()"></td><td class="part-tot-cell" style="text-align:center;font-family:'DM Mono',monospace;">¥0</td><td><input type="text" placeholder="備考"></td><td><button class="del-btn" onclick="this.closest('tr').remove();updPart()">✕</button></td>`;document.getElementById('part-tbody').appendChild(tr);}
@@ -585,18 +650,13 @@ async function saveDaily(){
   if(result){db.daily.unshift({...rec,storeId:rec.store_id,serviceRows:sR,stRows:stR,partRows:pR,createdAt:rec.created_at});toast('デイリーレポートを保存しました');}
   else alert('保存に失敗しました。通信状態を確認してください。');
 }
-function clearDaily(){document.getElementById('service-tbody').innerHTML='';document.getElementById('st-tbody').innerHTML='';document.getElementById('part-tbody').innerHTML='';rC=0;stC=0;pC=0;['d-visit','d-estimate','d-contract','d-tel','d-posting','d-ref'].forEach(id=>document.getElementById(id).value='0');document.getElementById('d-notes').value='';initDailyForm();}
+function clearDaily(){document.getElementById('service-tbody').innerHTML='';document.getElementById('st-tbody').innerHTML='';document.getElementById('part-tbody').innerHTML='';rC=0;stC=0;pC=0;['d-visit','d-estimate','d-contract','d-tel','d-posting','d-ref'].forEach(id=>document.getElementById(id).value='0');document.getElementById('d-notes').value='';document.getElementById('sched-import-bar').style.display='none';pendingSchedules=[];initDailyForm();}
 
 // MONTHLY
 function initMonthlyForm(){if(!document.getElementById('mr-month').value)document.getElementById('mr-month').value=thisMonth();if(!document.getElementById('mr-report-date').value)document.getElementById('mr-report-date').value=today();document.getElementById('mr-manager').value=currentUser.name;document.getElementById('mr-store').value=gs(currentUser.storeId).name;autoFillMonthly();}
-function autoFillMonthly(){
-  const month=document.getElementById('mr-month').value;if(!month)return;
-  const dailies=db.daily.filter(d=>d.storeId===currentUser.storeId&&(d.date||'').startsWith(month));
-  let tot=0,cnt=0,pc=0,stPay=0,vis=0,est=0,con=0,tel=0,pos=0,ref=0;const byT={};
-  dailies.forEach(d=>{(d.serviceRows||[]).forEach(r=>{if(!r.name)return;cnt++;const a=(Number(r.amount)||0)+(Number(r.otherSales)||0)+(Number(r.goodsSales)||0);tot+=a;const t=r.type||'その他';byT[t]=(byT[t]||0)+(Number(r.amount)||0);if(Number(r.otherSales)>0)byT['その他売上']=(byT['その他売上']||0)+(Number(r.otherSales)||0);if(Number(r.goodsSales)>0)byT['商品売上']=(byT['商品売上']||0)+(Number(r.goodsSales)||0);});stPay+=stTotal(d);pc+=partCnt(d);vis+=Number(d.visit)||0;est+=Number(d.estimate)||0;con+=Number(d.contract)||0;tel+=Number(d.tel)||0;pos+=Number(d.posting)||0;ref+=Number(d.referral)||0;});
+function autoFillMonthly(){const month=document.getElementById('mr-month').value;if(!month)return;const dailies=db.daily.filter(d=>d.storeId===currentUser.storeId&&(d.date||'').startsWith(month));let tot=0,cnt=0,pc=0,stPay=0,vis=0,est=0,con=0,tel=0,pos=0,ref=0;const byT={};dailies.forEach(d=>{(d.serviceRows||[]).forEach(r=>{if(!r.name)return;cnt++;const a=(Number(r.amount)||0)+(Number(r.otherSales)||0)+(Number(r.goodsSales)||0);tot+=a;const t=r.type||'その他';byT[t]=(byT[t]||0)+(Number(r.amount)||0);if(Number(r.otherSales)>0)byT['その他売上']=(byT['その他売上']||0)+(Number(r.otherSales)||0);if(Number(r.goodsSales)>0)byT['商品売上']=(byT['商品売上']||0)+(Number(r.goodsSales)||0);});stPay+=stTotal(d);pc+=partCnt(d);vis+=Number(d.visit)||0;est+=Number(d.estimate)||0;con+=Number(d.contract)||0;tel+=Number(d.tel)||0;pos+=Number(d.posting)||0;ref+=Number(d.referral)||0;});
   document.getElementById('mr-actual').value=tot||'';document.getElementById('mr-count').value=cnt||'';document.getElementById('mr-part').value=pc||'';document.getElementById('mr-est').value=est||'';document.getElementById('mr-visit').value=vis||'';document.getElementById('mr-tel').value=tel||'';document.getElementById('mr-post').value=pos||'';document.getElementById('mr-new').value=con||'';document.getElementById('mr-ref').value=ref||'';document.getElementById('mr-st-total').textContent=fy(stPay);
-  const cats=db.cats.service||DEF_CATS;const col=Math.min(cats.length,4);const bg=document.getElementById('mr-breakdown-grid');bg.style.gridTemplateColumns=`repeat(${col},1fr)`;bg.innerHTML=cats.map(c=>`<div class="summary-item"><div class="summary-key">${c}</div><div class="summary-val" style="font-size:14px;">${fy(byT[c]||0)}</div></div>`).join('');
-  calcMonthly();
+  const cats=db.cats.service||DEF_CATS;const col=Math.min(cats.length,4);const bg=document.getElementById('mr-breakdown-grid');bg.style.gridTemplateColumns=`repeat(${col},1fr)`;bg.innerHTML=cats.map(c=>`<div class="summary-item"><div class="summary-key">${c}</div><div class="summary-val" style="font-size:14px;">${fy(byT[c]||0)}</div></div>`).join('');calcMonthly();
   const saved=db.monthly.find(x=>x.month===month&&x.storeId===currentUser.storeId);
   if(saved){if(saved.budget)document.getElementById('mr-budget').value=saved.budget;if(saved.lastyear)document.getElementById('mr-lastyear').value=saved.lastyear;if(saved.zatsuRate||saved.zatsu_rate)document.getElementById('mr-zatsu-rate').value=saved.zatsuRate||saved.zatsu_rate;if(saved.newContractAmt||saved.new_contract_amt)document.getElementById('mr-new-amt').value=saved.newContractAmt||saved.new_contract_amt;if(saved.referralRcv||saved.referral_rcv)document.getElementById('mr-ref-rcv').value=saved.referralRcv||saved.referral_rcv;['done','issue','next'].forEach(k=>{if(saved[k])document.getElementById('mr-'+k).value=saved[k];});}
 }
@@ -610,17 +670,7 @@ async function saveMonthly(){
 }
 
 // SALES LIST
-function renderSalesList(){
-  const month=document.getElementById('filter-month').value;
-  let src=fbStore(db.daily);if(month)src=src.filter(d=>(d.date||'').startsWith(month));
-  const all=[];src.forEach(d=>(d.serviceRows||[]).forEach(r=>{if(!r.name)return;all.push({date:d.date,store:gs(d.storeId).name,type:r.type||'その他',name:r.name,amount:Number(r.amount)||0,other:Number(r.otherSales)||0,goods:Number(r.goodsSales)||0,route:r.route||''});}));
-  const grand=all.reduce((a,r)=>a+r.amount+r.other+r.goods,0);
-  const cats=[...(db.cats.service||DEF_CATS)];all.forEach(r=>{if(!cats.includes(r.type))cats.push(r.type);});
-  const pc={定期:'pill-blue',スポット:'pill-green',新スポット:'pill-yellow',その他:'pill-purple',商品:'pill-red'};
-  let html=`<div class="sales-grand"><div style="color:var(--text2);font-size:13px;">${month||'全期間'} 売上総合計</div><div class="sales-grand-val">${fy(grand)}</div></div>`;
-  cats.forEach(cat=>{const rows=all.filter(r=>r.type===cat).sort((a,b)=>b.date>a.date?1:-1);if(!rows.length)return;const ct=rows.reduce((a,r)=>a+r.amount,0),ot=rows.reduce((a,r)=>a+r.other,0),gt=rows.reduce((a,r)=>a+r.goods,0);html+=`<div class="sales-group"><div class="sales-group-hd"><div class="sales-group-title"><span class="pill ${pc[cat]||'pill-gray'}">${cat}</span></div><div class="sales-group-total">${fy(ct)}${ot>0?` + その他 ${fy(ot)}`:''}${gt>0?` + 商品 ${fy(gt)}`:''}</div></div><table><thead><tr><th>日付</th><th>店舗</th><th>顧客名</th><th>売上(税抜)</th><th>その他</th><th>商品</th><th>経路</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r.date}</td><td class="td-sub">${r.store}</td><td>${r.name}</td><td class="td-mono">${fy(r.amount)}</td><td class="td-mono td-sub">${r.other>0?fy(r.other):'—'}</td><td class="td-mono td-sub">${r.goods>0?fy(r.goods):'—'}</td><td class="td-sub">${r.route||'—'}</td></tr>`).join('')}</tbody></table></div>`;});
-  document.getElementById('sales-list-content').innerHTML=html||'<p style="color:var(--text2);padding:20px;">データがありません</p>';
-}
+function renderSalesList(){const month=document.getElementById('filter-month').value;let src=fbStore(db.daily);if(month)src=src.filter(d=>(d.date||'').startsWith(month));const all=[];src.forEach(d=>(d.serviceRows||[]).forEach(r=>{if(!r.name)return;all.push({date:d.date,store:gs(d.storeId).name,type:r.type||'その他',name:r.name,amount:Number(r.amount)||0,other:Number(r.otherSales)||0,goods:Number(r.goodsSales)||0,route:r.route||''});}));const grand=all.reduce((a,r)=>a+r.amount+r.other+r.goods,0);const cats=[...(db.cats.service||DEF_CATS)];all.forEach(r=>{if(!cats.includes(r.type))cats.push(r.type);});const pc={定期:'pill-blue',スポット:'pill-green',新スポット:'pill-yellow',その他:'pill-purple',商品:'pill-red'};let html=`<div class="sales-grand"><div style="color:var(--text2);font-size:13px;">${month||'全期間'} 売上総合計</div><div class="sales-grand-val">${fy(grand)}</div></div>`;cats.forEach(cat=>{const rows=all.filter(r=>r.type===cat).sort((a,b)=>b.date>a.date?1:-1);if(!rows.length)return;const ct=rows.reduce((a,r)=>a+r.amount,0),ot=rows.reduce((a,r)=>a+r.other,0),gt=rows.reduce((a,r)=>a+r.goods,0);html+=`<div class="sales-group"><div class="sales-group-hd"><div class="sales-group-title"><span class="pill ${pc[cat]||'pill-gray'}">${cat}</span></div><div class="sales-group-total">${fy(ct)}${ot>0?` + その他 ${fy(ot)}`:''}${gt>0?` + 商品 ${fy(gt)}`:''}</div></div><table><thead><tr><th>日付</th><th>店舗</th><th>顧客名</th><th>売上(税抜)</th><th>その他</th><th>商品</th><th>経路</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r.date}</td><td class="td-sub">${r.store}</td><td>${r.name}</td><td class="td-mono">${fy(r.amount)}</td><td class="td-mono td-sub">${r.other>0?fy(r.other):'—'}</td><td class="td-mono td-sub">${r.goods>0?fy(r.goods):'—'}</td><td class="td-sub">${r.route||'—'}</td></tr>`).join('')}</tbody></table></div>`;});document.getElementById('sales-list-content').innerHTML=html||'<p style="color:var(--text2);padding:20px;">データがありません</p>';}
 
 // DAILY LIST
 function renderDailyList(){const month=document.getElementById('filter-daily-month').value;let data=fbStore(db.daily);if(month)data=data.filter(d=>(d.date||'').startsWith(month));data=[...data].sort((a,b)=>b.date>a.date?1:-1);document.getElementById('daily-count-badge').textContent=data.length+'件';const wi={'晴れ':'☀️','曇り':'☁️','雨':'🌧','雪':'❄️'};document.getElementById('daily-list-tbody').innerHTML=data.length===0?'<tr><td colspan="11" style="color:var(--text2);text-align:center;padding:20px;">日報がありません</td></tr>':data.map(d=>`<tr><td>${d.date}</td><td class="td-sub">${gs(d.storeId).name}</td><td>${d.author||'—'}</td><td>${(wi[d.weather]||'')+' '+(d.weather||'')}</td><td class="td-mono">${(d.serviceRows||[]).filter(r=>r.name).length}件</td><td class="td-mono">${fy(dTotal(d))}</td><td class="td-mono td-sub">${fy(stTotal(d))}</td><td class="td-mono td-sub">${fy(partCost(d))}</td><td class="td-mono">${d.visit||0}</td><td class="td-mono">${d.estimate||0}</td><td class="td-actions"><button class="btn btn-danger btn-sm" onclick="delDaily('${d.id}')">削除</button></td></tr>`).join('');}
@@ -634,41 +684,13 @@ async function delMonthly(id){if(!confirm('削除しますか？'))return;await 
 // ADMIN STORES
 function renderStores(){document.getElementById('stores-tbody').innerHTML=db.stores.length===0?'<tr><td colspan="4" style="color:var(--text2);text-align:center;padding:20px;">店舗がありません</td></tr>':db.stores.map(s=>`<tr><td><strong>${s.name}</strong></td><td class="td-sub">${s.dept||'—'}</td><td class="td-sub">${s.created_at||s.createdAt||'—'}</td><td class="td-actions"><button class="btn btn-ghost btn-sm" onclick="openStoreModal('${s.id}')">編集</button><button class="btn btn-danger btn-sm" onclick="delStore('${s.id}')">削除</button></td></tr>`).join('');}
 function openStoreModal(id){const s=id?db.stores.find(x=>x.id===id):null;document.getElementById('store-modal-title').textContent=s?'店舗編集':'店舗追加';document.getElementById('sm-name').value=s?s.name:'';document.getElementById('sm-dept').value=s?s.dept||'':'';document.getElementById('sm-edit-id').value=id||'';document.getElementById('store-modal').classList.add('open');}
-async function saveStore(){
-  const name=document.getElementById('sm-name').value.trim();if(!name){alert('店舗名を入力してください');return;}
-  const eid=document.getElementById('sm-edit-id').value;
-  if(eid){
-    await sbUpdate('stores','id=eq.'+eid,{name,dept:document.getElementById('sm-dept').value.trim()});
-    const s=db.stores.find(x=>x.id===eid);if(s){s.name=name;s.dept=document.getElementById('sm-dept').value.trim();}
-  }else{
-    const newStore={id:'s'+uid(),name,dept:document.getElementById('sm-dept').value.trim(),created_at:today()};
-    await sbInsert('stores',newStore);db.stores.push(newStore);
-  }
-  closeModal('store-modal');renderStores();buildStoreFilter();toast(eid?'店舗を更新しました':'店舗を追加しました');
-}
+async function saveStore(){const name=document.getElementById('sm-name').value.trim();if(!name){alert('店舗名を入力してください');return;}const eid=document.getElementById('sm-edit-id').value;if(eid){await sbUpdate('stores','id=eq.'+eid,{name,dept:document.getElementById('sm-dept').value.trim()});const s=db.stores.find(x=>x.id===eid);if(s){s.name=name;s.dept=document.getElementById('sm-dept').value.trim();}}else{const newStore={id:'s'+uid(),name,dept:document.getElementById('sm-dept').value.trim(),created_at:today()};await sbInsert('stores',newStore);db.stores.push(newStore);}closeModal('store-modal');renderStores();buildStoreFilter();toast(eid?'店舗を更新しました':'店舗を追加しました');}
 async function delStore(id){if(db.users.filter(u=>(u.store_id||u.storeId)===id).length>0){alert('この店舗のユーザーが存在します');return;}if(!confirm('削除しますか？'))return;await sbDelete('stores','id=eq.'+id);db.stores=db.stores.filter(s=>s.id!==id);renderStores();buildStoreFilter();toast('削除しました');}
 
 // ADMIN USERS
 function renderUsers(){document.getElementById('users-tbody').innerHTML=db.users.length===0?'<tr><td colspan="7" style="color:var(--text2);text-align:center;padding:20px;">ユーザーがありません</td></tr>':db.users.map(u=>`<tr><td class="td-mono">${u.login_id||u.loginId}</td><td><strong>${u.name}</strong></td><td class="td-sub">${gs(u.store_id||u.storeId).name}</td><td class="td-sub">${u.dept||'—'}</td><td class="td-sub">${u.position||'—'}</td><td><span class="pill ${RB[u.role]||'pill-gray'}">${RL[u.role]||u.role}</span></td><td class="td-actions"><button class="btn btn-ghost btn-sm" onclick="openUserModal('${u.id}')">編集</button><button class="btn btn-danger btn-sm" onclick="delUser('${u.id}')">削除</button></td></tr>`).join('');}
 function openUserModal(id){const u=id?db.users.find(x=>x.id===id):null;document.getElementById('user-modal-title').textContent=u?'ユーザー編集':'ユーザー追加';document.getElementById('um-name').value=u?u.name:'';document.getElementById('um-id').value=u?u.login_id||u.loginId:'';document.getElementById('um-pw').value='';document.getElementById('um-dept').value=u?u.dept||'':'';document.getElementById('um-position').value=u?u.position||'':'';document.getElementById('um-role').value=u?u.role:'general';document.getElementById('um-edit-id').value=id||'';document.getElementById('um-store').innerHTML=db.stores.map(s=>`<option value="${s.id}"${u&&(u.store_id||u.storeId)===s.id?' selected':''}>${s.name}</option>`).join('');document.getElementById('user-modal').classList.add('open');}
-async function saveUser(){
-  const name=document.getElementById('um-name').value.trim(),lid=document.getElementById('um-id').value.trim(),pw=document.getElementById('um-pw').value;
-  if(!name||!lid){alert('氏名とIDは必須です');return;}
-  const eid=document.getElementById('um-edit-id').value;
-  if(db.users.find(u=>(u.login_id||u.loginId)===lid&&u.id!==eid)){alert('このIDはすでに使われています');return;}
-  const storeId=document.getElementById('um-store').value;
-  if(eid){
-    const upd={name,login_id:lid,store_id:storeId,dept:document.getElementById('um-dept').value.trim(),position:document.getElementById('um-position').value.trim(),role:document.getElementById('um-role').value};
-    if(pw)upd.pw=pw;
-    await sbUpdate('users','id=eq.'+eid,upd);
-    const u=db.users.find(x=>x.id===eid);if(u){Object.assign(u,upd,{loginId:lid,storeId});}
-  }else{
-    if(!pw||pw.length<4){alert('パスワードは4文字以上で入力してください');return;}
-    const newUser={id:uid(),name,login_id:lid,pw,store_id:storeId,dept:document.getElementById('um-dept').value.trim(),position:document.getElementById('um-position').value.trim(),role:document.getElementById('um-role').value,created_at:today()};
-    await sbInsert('users',newUser);db.users.push({...newUser,loginId:lid,storeId});
-  }
-  closeModal('user-modal');renderUsers();toast(eid?'ユーザーを更新しました':'ユーザーを追加しました');
-}
+async function saveUser(){const name=document.getElementById('um-name').value.trim(),lid=document.getElementById('um-id').value.trim(),pw=document.getElementById('um-pw').value;if(!name||!lid){alert('氏名とIDは必須です');return;}const eid=document.getElementById('um-edit-id').value;if(db.users.find(u=>(u.login_id||u.loginId)===lid&&u.id!==eid)){alert('このIDはすでに使われています');return;}const storeId=document.getElementById('um-store').value;if(eid){const upd={name,login_id:lid,store_id:storeId,dept:document.getElementById('um-dept').value.trim(),position:document.getElementById('um-position').value.trim(),role:document.getElementById('um-role').value};if(pw)upd.pw=pw;await sbUpdate('users','id=eq.'+eid,upd);const u=db.users.find(x=>x.id===eid);if(u){Object.assign(u,upd,{loginId:lid,storeId});}}else{if(!pw||pw.length<4){alert('パスワードは4文字以上で入力してください');return;}const newUser={id:uid(),name,login_id:lid,pw,store_id:storeId,dept:document.getElementById('um-dept').value.trim(),position:document.getElementById('um-position').value.trim(),role:document.getElementById('um-role').value,created_at:today()};await sbInsert('users',newUser);db.users.push({...newUser,loginId:lid,storeId});}closeModal('user-modal');renderUsers();toast(eid?'ユーザーを更新しました':'ユーザーを追加しました');}
 async function delUser(id){if(id===currentUser.id){alert('自分自身は削除できません');return;}if(!confirm('削除しますか？'))return;await sbDelete('users','id=eq.'+id);db.users=db.users.filter(u=>u.id!==id);renderUsers();toast('削除しました');}
 
 // ADMIN ALL SALES
@@ -695,13 +717,7 @@ function closeModal(id){document.getElementById(id).classList.remove('open');}
 function closePrintModal(){document.getElementById('print-modal').classList.remove('open');}
 ['print-modal','store-modal','user-modal'].forEach(id=>{document.getElementById(id).addEventListener('click',function(e){if(e.target===this){if(id==='print-modal')closePrintModal();else closeModal(id);}});});
 
-// ===== 起動 =====
-(async()=>{
-  showLoading(true);
-  const restored=await tryRestore();
-  showLoading(false);
-  if(restored)startApp();
-})();
+(async()=>{showLoading(true);const restored=await tryRestore();showLoading(false);if(restored)startApp();})();
 </script>
 </body>
 </html>
