@@ -505,7 +505,24 @@ function startApp(){
 }
 function buildSidebar(){const r=currentUser.role;let h='';h+=`<div class="nav-label">メイン</div>${ni('dashboard','📊','ダッシュボード')}`;h+=`<div class="nav-label">入力</div>${ni('daily','📝','デイリーレポート')}`;if(r!=='general'){h+=ni('monthly-report','📋','月間運営報告');h+=`<div class="nav-label">閲覧</div>${ni('sales-list','📈','売上一覧')}${ni('daily-list','🗂️','日報一覧')}${ni('monthly-list','📑','月間報告一覧')}`;h+=`<div class="nav-label">ツール</div>${ni('export','⬇️','エクスポート')}`;}if(r==='admin')h+=`<div class="nav-label">管理者</div>${ni('admin-stores','🏢','店舗管理')}${ni('admin-users','👥','アカウント管理')}${ni('admin-sales','📊','全店舗 売上')}${ni('admin-settings','⚙️','マスタ設定')}`;document.getElementById('sidebar-nav').innerHTML=h;}
 function ni(id,icon,label){return`<div class="nav-item" id="nav-${id}" onclick="showPage('${id}')"><span class="nav-icon">${icon}</span>${label}</div>`;}
-function buildStoreFilter(){if(currentUser.role!=='admin'){document.getElementById('store-filter-wrap').style.display='none';return;}document.getElementById('store-filter-wrap').style.display='flex';document.getElementById('global-store-filter').innerHTML='<option value="all">全店舗</option>'+db.stores.map(s=>`<option value="${s.id}">${s.name}${s.dept?' '+s.dept:''}</option>`).join('');}
+function buildStoreFilter(){
+  const r=currentUser.role;
+  document.getElementById('store-filter-wrap').style.display='flex';
+  if(r==='admin'||r==='manager'){
+    // admin/manager: 全店舗切り替え可
+    document.getElementById('global-store-filter').innerHTML='<option value="all">全店舗</option>'+db.stores.map(s=>`<option value="${s.id}">${s.name}${s.dept?' '+s.dept:''}</option>`).join('');
+  } else {
+    // general: 登録店のみ選択可
+    const myIds=currentUser.store_ids||currentUser.storeIds||[currentUser.storeId].filter(Boolean);
+    const myStores=db.stores.filter(s=>myIds.includes(s.id));
+    document.getElementById('global-store-filter').innerHTML=myStores.map(s=>`<option value="${s.id}">${s.name}${s.dept?' '+s.dept:''}</option>`).join('');
+    // generalはデフォルトで最初の登録店を選択
+    if(myStores.length>0){
+      activeStoreFilter=myStores[0].id;
+      document.getElementById('global-store-filter').value=myStores[0].id;
+    }
+  }
+}
 function onStoreFilterChange(){
   activeStoreFilter=document.getElementById('global-store-filter').value;
   // 左上の店舗名も更新
@@ -537,11 +554,13 @@ function showPage(id){
   if(id==='dashboard')renderDashboard();else if(id==='daily')initDailyForm();else if(id==='monthly-report')initMonthlyForm();else if(id==='sales-list')renderSalesList().catch(console.error);else if(id==='daily-list')renderDailyList();else if(id==='monthly-list')renderMonthlyList();else if(id==='export')initExportPage();else if(id==='admin-stores')renderStores();else if(id==='admin-users')renderUsers();else if(id==='admin-sales')renderAdminSales();else if(id==='admin-settings')renderSettings();
 }
 function visIds(){
-  if(currentUser.role==='admin'){
+  const r=currentUser.role;
+  if(r==='admin'||r==='manager'){
     if(activeStoreFilter==='all')return db.stores.map(s=>s.id);
     return[activeStoreFilter];
   }
-  // 複数店舗対応
+  // general: フィルターで選んだ店舗（登録店の中から）
+  if(activeStoreFilter&&activeStoreFilter!=='all')return[activeStoreFilter];
   const ids=currentUser.store_ids||currentUser.storeIds||[];
   if(ids.length>0)return ids;
   return[currentUser.storeId].filter(Boolean);
@@ -579,7 +598,7 @@ function rtOpts(sel){return'<option value="">—</option>'+db.cats.route.map(r=>
 function initDailyForm(){
   if(!document.getElementById('d-date').value)document.getElementById('d-date').value=today();
   document.getElementById('d-author').value=currentUser.name;
-  document.getElementById('d-store').value=gs(currentUser.storeId).name;
+  document.getElementById('d-store').value=inputStoreName();
   if(!document.getElementById('service-tbody').children.length){addServiceRow();addServiceRow();addServiceRow();}
   if(!document.getElementById('st-tbody').children.length)addSTRow();
   if(!document.getElementById('part-tbody').children.length)addPartRow();
@@ -682,7 +701,7 @@ async function saveDaily(){
   const sR=[];document.getElementById('service-tbody').querySelectorAll('tr').forEach((tr,i)=>{const inp=tr.querySelectorAll('input,select');const name=inp[0]?inp[0].value.trim():'';if(!name)return;sR.push({no:i+1,name,startTime:inp[1]?inp[1].value:'',endTime:inp[2]?inp[2].value:'',hours:inp[3]?inp[3].value:'',staff:inp[4]?inp[4].value:'',pa:inp[5]?inp[5].value:'',type:inp[6]?inp[6].value:'',content:inp[7]?inp[7].value:'',result:inp[8]?inp[8].value:'',amount:Number(inp[9]?inp[9].value:0)||0,payment:Number(inp[10]?inp[10].value:0)||0,receivable:Number(inp[11]?inp[11].value:0)||0,otherSales:Number(inp[12]?inp[12].value:0)||0,goodsSales:Number(inp[13]?inp[13].value:0)||0,route:inp[14]?inp[14].value:''});});
   const stR=[];document.getElementById('st-tbody').querySelectorAll('tr').forEach((tr,i)=>{const inp=tr.querySelectorAll('input');const name=inp[0]?inp[0].value.trim():'';if(!name)return;stR.push({no:i+1,name,content:inp[1]?inp[1].value:'',startTime:inp[2]?inp[2].value:'',endTime:inp[3]?inp[3].value:'',hours:inp[4]?inp[4].value:'',payExTax:Number(inp[5]?inp[5].value:0)||0,payInTax:Number(inp[6]?inp[6].value:0)||0,note:inp[7]?inp[7].value:''});});
   const pR=[];document.getElementById('part-tbody').querySelectorAll('tr').forEach((tr,i)=>{const inp=tr.querySelectorAll('input');const name=inp[0]?inp[0].value.trim():'';if(!name)return;pR.push({no:i+1,name,place:inp[1]?inp[1].value:'',startTime:inp[2]?inp[2].value:'',endTime:inp[3]?inp[3].value:'',hours:inp[4]?inp[4].value:'',daily:Number(inp[5]?inp[5].value:0)||0,transport:Number(inp[6]?inp[6].value:0)||0,note:inp[7]?inp[7].value:''});});
-  const rec={id:uid(),date,store_id:currentUser.storeId,author:currentUser.name,weather:document.getElementById('d-weather').value,service_rows:sR,st_rows:stR,part_rows:pR,visit:document.getElementById('d-visit').value,estimate:document.getElementById('d-estimate').value,contract:document.getElementById('d-contract').value,tel:document.getElementById('d-tel').value,posting:document.getElementById('d-posting').value,referral:document.getElementById('d-ref').value,notes:document.getElementById('d-notes').value,created_at:today()};
+  const rec={id:uid(),date,store_id:inputStoreId(),author:currentUser.name,weather:document.getElementById('d-weather').value,service_rows:sR,st_rows:stR,part_rows:pR,visit:document.getElementById('d-visit').value,estimate:document.getElementById('d-estimate').value,contract:document.getElementById('d-contract').value,tel:document.getElementById('d-tel').value,posting:document.getElementById('d-posting').value,referral:document.getElementById('d-ref').value,notes:document.getElementById('d-notes').value,created_at:today()};
   const result=await sbInsert('daily',rec);
   if(result){db.daily.unshift({...rec,storeId:rec.store_id,serviceRows:sR,stRows:stR,partRows:pR,createdAt:rec.created_at});toast('デイリーレポートを保存しました');}
   else alert('保存に失敗しました。通信状態を確認してください。');
@@ -690,8 +709,8 @@ async function saveDaily(){
 function clearDaily(){document.getElementById('service-tbody').innerHTML='';document.getElementById('st-tbody').innerHTML='';document.getElementById('part-tbody').innerHTML='';rC=0;stC=0;pC=0;['d-visit','d-estimate','d-contract','d-tel','d-posting','d-ref'].forEach(id=>document.getElementById(id).value='0');document.getElementById('d-notes').value='';document.getElementById('sched-import-bar').style.display='none';pendingSchedules=[];initDailyForm();}
 
 // MONTHLY
-function initMonthlyForm(){if(!document.getElementById('mr-month').value)document.getElementById('mr-month').value=thisMonth();if(!document.getElementById('mr-report-date').value)document.getElementById('mr-report-date').value=today();document.getElementById('mr-manager').value=currentUser.name;document.getElementById('mr-store').value=gs(currentUser.storeId).name;autoFillMonthly();}
-function autoFillMonthly(){const month=document.getElementById('mr-month').value;if(!month)return;const dailies=db.daily.filter(d=>d.storeId===currentUser.storeId&&(d.date||'').startsWith(month));let tot=0,cnt=0,pc=0,stPay=0,vis=0,est=0,con=0,tel=0,pos=0,ref=0;const byT={};dailies.forEach(d=>{(d.serviceRows||[]).forEach(r=>{if(!r.name)return;cnt++;const a=(Number(r.amount)||0)+(Number(r.otherSales)||0)+(Number(r.goodsSales)||0);tot+=a;const t=r.type||'その他';byT[t]=(byT[t]||0)+(Number(r.amount)||0);if(Number(r.otherSales)>0)byT['その他売上']=(byT['その他売上']||0)+(Number(r.otherSales)||0);if(Number(r.goodsSales)>0)byT['商品売上']=(byT['商品売上']||0)+(Number(r.goodsSales)||0);});stPay+=stTotal(d);pc+=partCnt(d);vis+=Number(d.visit)||0;est+=Number(d.estimate)||0;con+=Number(d.contract)||0;tel+=Number(d.tel)||0;pos+=Number(d.posting)||0;ref+=Number(d.referral)||0;});
+function initMonthlyForm(){if(!document.getElementById('mr-month').value)document.getElementById('mr-month').value=thisMonth();if(!document.getElementById('mr-report-date').value)document.getElementById('mr-report-date').value=today();document.getElementById('mr-manager').value=currentUser.name;document.getElementById('mr-store').value=inputStoreName();autoFillMonthly();}
+function autoFillMonthly(){const month=document.getElementById('mr-month').value;if(!month)return;const dailies=db.daily.filter(d=>d.storeId===inputStoreId()&&(d.date||'').startsWith(month));let tot=0,cnt=0,pc=0,stPay=0,vis=0,est=0,con=0,tel=0,pos=0,ref=0;const byT={};dailies.forEach(d=>{(d.serviceRows||[]).forEach(r=>{if(!r.name)return;cnt++;const a=(Number(r.amount)||0)+(Number(r.otherSales)||0)+(Number(r.goodsSales)||0);tot+=a;const t=r.type||'その他';byT[t]=(byT[t]||0)+(Number(r.amount)||0);if(Number(r.otherSales)>0)byT['その他売上']=(byT['その他売上']||0)+(Number(r.otherSales)||0);if(Number(r.goodsSales)>0)byT['商品売上']=(byT['商品売上']||0)+(Number(r.goodsSales)||0);});stPay+=stTotal(d);pc+=partCnt(d);vis+=Number(d.visit)||0;est+=Number(d.estimate)||0;con+=Number(d.contract)||0;tel+=Number(d.tel)||0;pos+=Number(d.posting)||0;ref+=Number(d.referral)||0;});
   document.getElementById('mr-actual').value=tot||'';document.getElementById('mr-count').value=cnt||'';document.getElementById('mr-part').value=pc||'';document.getElementById('mr-est').value=est||'';document.getElementById('mr-visit').value=vis||'';document.getElementById('mr-tel').value=tel||'';document.getElementById('mr-post').value=pos||'';document.getElementById('mr-new').value=con||'';document.getElementById('mr-ref').value=ref||'';document.getElementById('mr-st-total').textContent=fy(stPay);
   const cats=db.cats.service||DEF_CATS;const col=Math.min(cats.length,4);const bg=document.getElementById('mr-breakdown-grid');bg.style.gridTemplateColumns=`repeat(${col},1fr)`;bg.innerHTML=cats.map(c=>`<div class="summary-item"><div class="summary-key">${c}</div><div class="summary-val" style="font-size:14px;">${fy(byT[c]||0)}</div></div>`).join('');calcMonthly();
   const saved=db.monthly.find(x=>x.month===month&&x.storeId===currentUser.storeId);
@@ -700,7 +719,7 @@ function autoFillMonthly(){const month=document.getElementById('mr-month').value
 function calcMonthly(){const a=Number(document.getElementById('mr-actual').value)||0,b=Number(document.getElementById('mr-budget').value)||0,l=Number(document.getElementById('mr-lastyear').value)||0,c=Number(document.getElementById('mr-count').value)||0;document.getElementById('mr-achievement').textContent=b>0?(a/b*100).toFixed(1)+'%':'—';document.getElementById('mr-vs-last').textContent=l>0?(a/l*100).toFixed(1)+'%':'—';document.getElementById('mr-unit-price').textContent=c>0?fy(Math.round(a/c)):'—';}
 async function saveMonthly(){
   const month=document.getElementById('mr-month').value;if(!month){alert('年月を入力してください');return;}
-  const rec={id:uid(),month,store_id:currentUser.storeId,report_date:document.getElementById('mr-report-date').value,manager:currentUser.name,budget:document.getElementById('mr-budget').value,actual:document.getElementById('mr-actual').value,lastyear:document.getElementById('mr-lastyear').value,count:document.getElementById('mr-count').value,part:document.getElementById('mr-part').value,zatsu_rate:document.getElementById('mr-zatsu-rate').value,estimate:document.getElementById('mr-est').value,visit:document.getElementById('mr-visit').value,tel:document.getElementById('mr-tel').value,posting:document.getElementById('mr-post').value,new_contract:document.getElementById('mr-new').value,new_contract_amt:document.getElementById('mr-new-amt').value,referral:document.getElementById('mr-ref').value,referral_rcv:document.getElementById('mr-ref-rcv').value,done:document.getElementById('mr-done').value,issue:document.getElementById('mr-issue').value,next:document.getElementById('mr-next').value};
+  const rec={id:uid(),month,store_id:inputStoreId(),report_date:document.getElementById('mr-report-date').value,manager:currentUser.name,budget:document.getElementById('mr-budget').value,actual:document.getElementById('mr-actual').value,lastyear:document.getElementById('mr-lastyear').value,count:document.getElementById('mr-count').value,part:document.getElementById('mr-part').value,zatsu_rate:document.getElementById('mr-zatsu-rate').value,estimate:document.getElementById('mr-est').value,visit:document.getElementById('mr-visit').value,tel:document.getElementById('mr-tel').value,posting:document.getElementById('mr-post').value,new_contract:document.getElementById('mr-new').value,new_contract_amt:document.getElementById('mr-new-amt').value,referral:document.getElementById('mr-ref').value,referral_rcv:document.getElementById('mr-ref-rcv').value,done:document.getElementById('mr-done').value,issue:document.getElementById('mr-issue').value,next:document.getElementById('mr-next').value};
   const result=await sbUpsert('monthly',rec);
   if(result){const idx=db.monthly.findIndex(x=>x.month===month&&x.storeId===currentUser.storeId);const mapped={...rec,storeId:rec.store_id,reportDate:rec.report_date,zatsuRate:rec.zatsu_rate,newContract:rec.new_contract,newContractAmt:rec.new_contract_amt,referralRcv:rec.referral_rcv};if(idx>=0)db.monthly[idx]=mapped;else db.monthly.unshift(mapped);toast('月間報告を保存しました');}
   else alert('保存に失敗しました。');
@@ -796,6 +815,22 @@ function printMonthlyReport(){const month=document.getElementById('print-monthly
 function printSalesReport(){const month=document.getElementById('print-sales-select').value;if(!month){alert('月を選択してください');return;}let src=fbStore(db.daily).filter(d=>(d.date||'').startsWith(month));if(!src.length){alert('そのデータがありません');return;}const all=[];src.forEach(d=>(d.serviceRows||[]).forEach(r=>{if(r.name)all.push({date:d.date,store:gs(d.storeId).name,type:r.type||'その他',name:r.name,amount:Number(r.amount)||0,other:Number(r.otherSales)||0,goods:Number(r.goodsSales)||0,route:r.route||''});}));all.sort((a,b)=>a.date>b.date?1:-1);const grand=all.reduce((a,r)=>a+r.amount+r.other+r.goods,0);document.getElementById('print-content').innerHTML=`<div style="padding:8px 0;"><div style="border-bottom:2px solid var(--border);padding-bottom:12px;margin-bottom:16px;"><div style="font-size:19px;font-weight:700;margin-bottom:3px;">${month} 月間売上一覧</div></div><div style="font-size:26px;font-weight:700;margin-bottom:16px;font-family:'DM Mono',monospace;">総合計: ${fy(grand)}</div><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr>${['日付','店舗','区分','顧客名','売上(税抜)','その他','商品','経路'].map(h=>`<th style="text-align:left;padding:7px 10px;border:1px solid var(--border);background:var(--bg3);font-size:11px;">${h}</th>`).join('')}</tr></thead><tbody>${all.map(r=>`<tr>${[r.date,r.store,r.type,r.name,fy(r.amount),r.other>0?fy(r.other):'—',r.goods>0?fy(r.goods):'—',r.route||'—'].map(v=>`<td style="padding:7px 10px;border:1px solid var(--border);">${v}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;document.getElementById('print-modal').classList.add('open');}
 function buildMPrint(m,storeName){const a=Number(m.actual)||0,b=Number(m.budget)||0,l=Number(m.lastyear)||0,c=Number(m.count)||0,rate=b>0?(a/b*100).toFixed(1)+'%':'—',vsL=l>0?(a/l*100).toFixed(1)+'%':'—',up=c>0?fy(Math.round(a/c)):'—';return`<div style="padding:8px 0;"><div style="border-bottom:2px solid var(--border);padding-bottom:12px;margin-bottom:16px;"><div style="font-size:19px;font-weight:700;margin-bottom:3px;">${m.month} 月間運営報告書</div><div style="font-size:12px;color:var(--text2);">${storeName}　報告日: ${m.reportDate||m.report_date||''}　担当: ${m.manager||''}</div></div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">${[['売上予算',fy(b)],['売上実績',fy(a)],['達成率',rate],['昨対比',vsL],['件数',c+'件'],['客単価',up]].map(([k,v])=>`<div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:11px 13px;"><div style="font-size:11px;color:var(--text2);margin-bottom:3px;">${k}</div><div style="font-size:16px;font-weight:600;font-family:'DM Mono',monospace;">${v}</div></div>`).join('')}</div><table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px;"><thead><tr><th style="text-align:left;padding:7px 10px;border:1px solid var(--border);background:var(--bg3);font-size:11px;">営業指標</th><th style="text-align:right;padding:7px 10px;border:1px solid var(--border);background:var(--bg3);font-size:11px;">件数</th></tr></thead><tbody>${[['見積',m.estimate],['訪問',m.visit],['TELアポ',m.tel],['ポスティング',m.posting],['新規契約',m.newContract||m.new_contract],['紹介',m.referral]].map(([k,v])=>`<tr><td style="padding:7px 10px;border:1px solid var(--border);">${k}</td><td style="text-align:right;padding:7px 10px;border:1px solid var(--border);">${v||0}</td></tr>`).join('')}</tbody></table>${[['4. 実施したこと',m.done],['5. 課題・改善点',m.issue],['6. 来月の活動予定',m.next]].filter(([,v])=>v).map(([k,v])=>`<div style="margin-bottom:12px;"><div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:5px;">${k}</div><div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:11px 13px;font-size:13px;line-height:1.7;white-space:pre-wrap;">${v}</div></div>`).join('')}</div>`;}
 function exportBackup(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(db,null,2)],{type:'application/json'}));a.download=`backup_${today()}.json`;a.click();URL.revokeObjectURL(a.href);toast('バックアップを保存しました');}
+
+// 入力用店舗ID（登録店の中で現在選択中の店舗）
+function inputStoreId(){
+  const r=currentUser.role;
+  if(r==='admin')return activeStoreFilter!=='all'?activeStoreFilter:currentUser.storeId;
+  // manager/general: フィルターで選んだ店舗（登録店の範囲内）
+  if(activeStoreFilter&&activeStoreFilter!=='all'){
+    const myIds=currentUser.store_ids||currentUser.storeIds||[currentUser.storeId].filter(Boolean);
+    if(myIds.includes(activeStoreFilter))return activeStoreFilter;
+  }
+  return currentUser.storeId;
+}
+// 入力用店舗名
+function inputStoreName(){
+  return (gs(inputStoreId()).name||'—');
+}
 
 function updStoreHidden(){
   const checked=[...document.querySelectorAll('#um-store-checks input:checked')].map(c=>c.value);
