@@ -503,7 +503,26 @@ function startApp(){
 function buildSidebar(){const r=currentUser.role;let h='';h+=`<div class="nav-label">メイン</div>${ni('dashboard','📊','ダッシュボード')}`;h+=`<div class="nav-label">入力</div>${ni('daily','📝','デイリーレポート')}`;if(r!=='general'){h+=ni('monthly-report','📋','月間運営報告');h+=`<div class="nav-label">閲覧</div>${ni('sales-list','📈','売上一覧')}${ni('daily-list','🗂️','日報一覧')}${ni('monthly-list','📑','月間報告一覧')}`;h+=`<div class="nav-label">ツール</div>${ni('export','⬇️','エクスポート')}`;}if(r==='admin')h+=`<div class="nav-label">管理者</div>${ni('admin-stores','🏢','店舗管理')}${ni('admin-users','👥','アカウント管理')}${ni('admin-sales','📊','全店舗 売上')}${ni('admin-settings','⚙️','マスタ設定')}`;document.getElementById('sidebar-nav').innerHTML=h;}
 function ni(id,icon,label){return`<div class="nav-item" id="nav-${id}" onclick="showPage('${id}')"><span class="nav-icon">${icon}</span>${label}</div>`;}
 function buildStoreFilter(){if(currentUser.role!=='admin'){document.getElementById('store-filter-wrap').style.display='none';return;}document.getElementById('store-filter-wrap').style.display='flex';document.getElementById('global-store-filter').innerHTML='<option value="all">全店舗</option>'+db.stores.map(s=>`<option value="${s.id}">${s.name}${s.dept?' '+s.dept:''}</option>`).join('');}
-function onStoreFilterChange(){activeStoreFilter=document.getElementById('global-store-filter').value;renderDashboard();}
+function onStoreFilterChange(){
+  activeStoreFilter=document.getElementById('global-store-filter').value;
+  // 左上の店舗名も更新
+  if(activeStoreFilter==='all'){
+    document.getElementById('sb-store-name').textContent='全店舗';
+  } else {
+    const st=db.stores.find(s=>s.id===activeStoreFilter)||{};
+    document.getElementById('sb-store-name').textContent=(st.name||'—')+((st.dept&&st.dept.trim())?' '+st.dept.trim():'');
+  }
+  // 現在表示中のページを再描画
+  const activePage=document.querySelector('.page.active');
+  if(!activePage)return;
+  const id=activePage.id.replace('page-','');
+  if(id==='dashboard')renderDashboard();
+  else if(id==='sales-list')renderSalesList().catch(console.error);
+  else if(id==='daily-list')renderDailyList();
+  else if(id==='monthly-list')renderMonthlyList();
+  else if(id==='admin-sales')renderAdminSales();
+  else if(id==='daily')initDailyForm();
+}
 const PT={'dashboard':'ダッシュボード','daily':'デイリーレポート入力','monthly-report':'月間運営報告','sales-list':'売上一覧','daily-list':'日報一覧','monthly-list':'月間運営報告一覧','export':'エクスポート','admin-stores':'店舗管理','admin-users':'アカウント管理','admin-sales':'全店舗 売上報告','admin-settings':'マスタ設定'};
 function showPage(id){
   const r=currentUser.role;
