@@ -146,6 +146,23 @@ tbody td{padding:10px 12px;color:var(--text);}
 .sched-import-info{font-size:13px;color:var(--accent2);}
 .sched-import-count{font-size:12px;color:var(--text2);margin-top:2px;}
 @media print{body{background:#fff!important;color:#000!important;}.sidebar,.topbar,.btn,.modal-close,.no-print,#toast{display:none!important;}.main{margin-left:0!important;}.modal-overlay{display:block!important;position:static!important;background:#fff!important;}.modal{border:none!important;background:#fff!important;color:#000!important;max-height:none!important;width:100%!important;padding:0!important;}.print-area *{color:#000!important;background:#fff!important;border-color:#ccc!important;}}
+
+.xls{border-collapse:collapse;width:100%;font-size:12px;margin-bottom:18px;}
+.xls th,.xls td{border:1px solid var(--border);padding:5px 8px;text-align:left;vertical-align:top;}
+.xls .xh{background:var(--bg3);font-weight:700;text-align:center;}
+.xls .xh2{background:var(--bg3);font-weight:500;text-align:center;font-size:11px;}
+.xls td.td-mono{text-align:right;white-space:nowrap;}
+.xls .xd{font-weight:600;white-space:nowrap;}
+.xls .xtot{font-weight:700;}
+.xls .xsum td{background:var(--bg3);font-weight:700;}
+.xpre{font-size:9px;background:rgba(124,92,252,.15);color:#6d52e0;padding:0 4px;border-radius:4px;}
+.xls-summary{max-width:560px;margin-bottom:18px;}
+.xls-summary th{text-align:center;}
+.xls-route{margin-bottom:18px;}
+.xls-route th{text-align:center;}
+.xls-cap{font-size:12px;font-weight:700;margin-bottom:6px;color:var(--text2);}
+.xls-og{display:flex;gap:14px;max-width:560px;flex-wrap:wrap;}
+.xls-box{flex:1;min-width:200px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px 16px;}
 </style>
 </head>
 <body>
@@ -347,7 +364,7 @@ tbody td{padding:10px 12px;color:var(--text);}
 
     <!-- SALES LIST -->
     <div class="page" id="page-sales-list">
-      <div class="page-header"><h1>売上一覧</h1></div>
+      <div class="page-header"><h1>売上予定一覧</h1></div>
       <div class="card" style="padding:0;overflow:hidden;">
         <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;"><input type="month" class="form-input" id="filter-month" style="width:155px;" onchange="renderSalesList()"><span style="font-size:12px;color:var(--text2);">で絞り込み</span></div>
         <div id="sales-list-content" style="padding:20px;"></div>
@@ -548,7 +565,7 @@ function startApp(){
   document.getElementById('filter-month').value=thisMonth();document.getElementById('filter-daily-month').value=thisMonth();document.getElementById('admin-filter-month').value=thisMonth();
   showPage('dashboard');
 }
-function buildSidebar(){const r=currentUser.role;let h='';h+=`<div class="nav-label">メイン</div>${ni('dashboard','📊','ダッシュボード')}`;h+=`<div class="nav-label">入力</div>${ni('daily','📝','デイリーレポート')}`;if(r!=='general'){h+=ni('monthly-report','📋','月間運営報告');h+=`<div class="nav-label">閲覧</div>${ni('sales-list','📈','売上一覧')}${ni('daily-list','🗂️','日報一覧')}${ni('monthly-list','📑','月間報告一覧')}`;h+=`<div class="nav-label">ツール</div>${ni('export','⬇️','エクスポート')}${ni('store-routes','🛣️','経路設定')}${ni('budget','💰','予算設定')}`;}if(r==='admin')h+=`<div class="nav-label">管理者</div>${ni('admin-stores','🏢','店舗管理')}${ni('admin-users','👥','アカウント管理')}${ni('admin-sales','📊','全店舗 売上')}${ni('admin-settings','⚙️','マスタ設定')}`;document.getElementById('sidebar-nav').innerHTML=h;}
+function buildSidebar(){const r=currentUser.role;let h='';h+=`<div class="nav-label">メイン</div>${ni('dashboard','📊','ダッシュボード')}`;h+=`<div class="nav-label">入力</div>${ni('daily','📝','デイリーレポート')}`;if(r!=='general'){h+=ni('monthly-report','📋','月間運営報告');h+=`<div class="nav-label">閲覧</div>${ni('sales-list','📈','売上予定一覧')}${ni('daily-list','🗂️','日報一覧')}${ni('monthly-list','📑','月間報告一覧')}`;h+=`<div class="nav-label">ツール</div>${ni('export','⬇️','エクスポート')}${ni('store-routes','🛣️','経路設定')}${ni('budget','💰','予算設定')}`;}if(r==='admin')h+=`<div class="nav-label">管理者</div>${ni('admin-stores','🏢','店舗管理')}${ni('admin-users','👥','アカウント管理')}${ni('admin-sales','📊','全店舗 売上')}${ni('admin-settings','⚙️','マスタ設定')}`;document.getElementById('sidebar-nav').innerHTML=h;}
 function ni(id,icon,label){return`<div class="nav-item" id="nav-${id}" onclick="showPage('${id}')"><span class="nav-icon">${icon}</span>${label}</div>`;}
 function buildStoreFilter(){
   const r=currentUser.role;
@@ -623,7 +640,7 @@ function onViewFilterChange(){
   else if(id==='admin-sales')renderAdminSales();
   else if(id==='daily')initDailyForm();
 }
-const PT={'dashboard':'ダッシュボード','daily':'デイリーレポート入力','monthly-report':'月間運営報告','sales-list':'売上一覧','daily-list':'日報一覧','monthly-list':'月間運営報告一覧','export':'エクスポート','store-routes':'スポット獲得経路の設定','budget':'予算設定','admin-stores':'店舗管理','admin-users':'アカウント管理','admin-sales':'全店舗 売上報告','admin-settings':'マスタ設定'};
+const PT={'dashboard':'ダッシュボード','daily':'デイリーレポート入力','monthly-report':'月間運営報告','sales-list':'売上予定一覧','daily-list':'日報一覧','monthly-list':'月間運営報告一覧','export':'エクスポート','store-routes':'スポット獲得経路の設定','budget':'予算設定','admin-stores':'店舗管理','admin-users':'アカウント管理','admin-sales':'全店舗 売上報告','admin-settings':'マスタ設定'};
 function showPage(id){
   const r=currentUser.role;
   if(['monthly-report','sales-list','daily-list','monthly-list','export','store-routes','budget'].includes(id)&&r==='general')return;
@@ -823,23 +840,48 @@ async function loadScheduleSales(month){
 
 async function renderSalesList(){
   const month=document.getElementById('filter-month').value;
-  // スケジュールデータを取得（サービス区分のみ）
   const schedSales=await loadScheduleSales(month);
-  const schedRows=schedSales.map(s=>({
-    date:s.date,
-    store:gs(s.store_id)?.name||'—',
-    type:s.category||'その他',
-    name:s.name,
-    amount:Number(s.amount)||0,
-    other:0,goods:0,
-    route:s.route||'',
-    source:'schedule'
-  }));
-  // デイリーレポートのデータ
+  const schedRows=schedSales.filter(s=>s.date&&Number(s.amount)>0).map(s=>({date:s.date,type:s.category||'その他',name:s.name,amount:Number(s.amount)||0,other:0,goods:0,route:s.route||'',source:'schedule'}));
   let src=fbStore(db.daily);if(month)src=src.filter(d=>(d.date||'').startsWith(month));
-  const dailyRows=[];src.forEach(d=>(d.serviceRows||[]).forEach(r=>{if(!r.name)return;dailyRows.push({date:d.date,store:gs(d.storeId).name,type:r.type||'その他',name:r.name,amount:Number(r.amount)||0,other:Number(r.otherSales)||0,goods:Number(r.goodsSales)||0,route:r.route||'',source:'daily'});}));
-  // スケジュールデータのみ表示（デイリー登録済みは除外しない、両方表示）
-  const all=[...schedRows,...dailyRows];const grand=all.reduce((a,r)=>a+r.amount+r.other+r.goods,0);const cats=[...(db.cats.service||DEF_CATS)];all.forEach(r=>{if(!cats.includes(r.type))cats.push(r.type);});const pc={定期:'pill-blue',スポット:'pill-green',新スポット:'pill-yellow',その他:'pill-purple',商品:'pill-red'};const _bud=budgetForMonth(month,visIds());let html=(month?budgetSummaryHTML(month,grand,_bud,'予定＋日報 合計')+'<div style="height:14px"></div>':'')+`<div class="sales-grand"><div style="color:var(--text2);font-size:13px;">${month||'全期間'} 売上総合計</div><div class="sales-grand-val">${fy(grand)}</div></div>`;cats.forEach(cat=>{const rows=all.filter(r=>r.type===cat).sort((a,b)=>b.date>a.date?1:-1);if(!rows.length)return;const ct=rows.reduce((a,r)=>a+r.amount,0),ot=rows.reduce((a,r)=>a+r.other,0),gt=rows.reduce((a,r)=>a+r.goods,0);html+=`<div class="sales-group"><div class="sales-group-hd"><div class="sales-group-title"><span class="pill ${pc[cat]||'pill-gray'}">${cat}</span></div><div class="sales-group-total">${fy(ct)}${ot>0?` + その他 ${fy(ot)}`:''}${gt>0?` + 商品 ${fy(gt)}`:''}</div></div><table><thead><tr><th>日付</th><th>店舗</th><th>顧客名</th><th>売上(税抜)</th><th>その他</th><th>商品</th><th>経路</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r.date}${r.source==='schedule'?'<span style="font-size:9px;background:rgba(124,92,252,.15);color:#7c5cfc;padding:1px 5px;border-radius:4px;margin-left:4px">予定</span>':''}</td><td class="td-sub">${r.store}</td><td>${r.name}</td><td class="td-mono">${fy(r.amount)}</td><td class="td-mono td-sub">${r.other>0?fy(r.other):'—'}</td><td class="td-mono td-sub">${r.goods>0?fy(r.goods):'—'}</td><td class="td-sub">${r.route||'—'}</td></tr>`).join('')}</tbody></table></div>`;});document.getElementById('sales-list-content').innerHTML=html||'<p style="color:var(--text2);padding:20px;">データがありません</p>';}
+  const dailyRows=[];src.forEach(d=>(d.serviceRows||[]).forEach(r=>{if(!r.name)return;const amt=Number(r.amount)||0,ot=Number(r.otherSales)||0,gd=Number(r.goodsSales)||0;if(amt<=0&&ot<=0&&gd<=0)return;dailyRows.push({date:d.date,type:r.type||'その他',name:r.name,amount:amt,other:ot,goods:gd,route:r.route||'',source:'daily'});}));
+  const all=[...schedRows,...dailyRows];
+  const COLS=['定期','スポット','新スポット'];
+  const colBg={'定期':'#d9f2f7','スポット':'#fbf3c5','新スポット':'#fbe0c4'};
+  const fmt=n=>n?fy(n):'';
+  let dates=[];
+  if(month){const p=month.split('-');const y=Number(p[0]),m=Number(p[1]);const dim=new Date(y,m,0).getDate();for(let d=1;d<=dim;d++)dates.push(`${month}-${String(d).padStart(2,'0')}`);}
+  else{dates=[...new Set(all.map(r=>r.date))].sort();}
+  const catTot={},catCnt={};COLS.forEach(c=>{catTot[c]=0;catCnt[c]=0;});
+  let otherTot=0,goodsTot=0;
+  all.forEach(r=>{if(COLS.includes(r.type)){catTot[r.type]+=r.amount;if(r.amount>0)catCnt[r.type]++;}otherTot+=r.other;goodsTot+=r.goods;});
+  const grand3=COLS.reduce((a,c)=>a+catTot[c],0);
+  const cnt3=COLS.reduce((a,c)=>a+catCnt[c],0);
+  let g=`<div style="overflow-x:auto"><table class="xls"><thead><tr><th rowspan="2" class="xh">日付</th><th colspan="2" class="xh" style="background:${colBg['定期']}">定期</th><th colspan="2" class="xh" style="background:${colBg['スポット']}">スポット</th><th colspan="2" class="xh" style="background:${colBg['新スポット']}">新スポット</th><th rowspan="2" class="xh">本日売上</th></tr><tr>${COLS.map(c=>`<th class="xh2" style="background:${colBg[c]}">顧客名</th><th class="xh2" style="background:${colBg[c]}">金額</th>`).join('')}</tr></thead><tbody>`;
+  dates.forEach(dk=>{
+    const dayItems=all.filter(r=>r.date===dk);
+    const dayTot=dayItems.reduce((a,r)=>a+r.amount+r.other+r.goods,0);
+    const md=dk.split('-');const label=`${Number(md[1])}/${Number(md[2])}`;
+    const cell=cat=>{const items=dayItems.filter(r=>r.type===cat);const bg=colBg[cat]+'22';if(!items.length)return `<td style="background:${bg}"></td><td style="background:${bg}"></td>`;return `<td style="background:${bg}">${items.map(r=>`<div>${r.name}${r.source==='schedule'?' <span class="xpre">予定</span>':''}</div>`).join('')}</td><td class="td-mono" style="background:${bg}">${items.map(r=>`<div>${fmt(r.amount)}</div>`).join('')}</td>`;};
+    g+=`<tr><td class="xd">${label}</td>${COLS.map(cell).join('')}<td class="td-mono xtot">${fmt(dayTot)}</td></tr>`;
+  });
+  g+=`<tr class="xsum"><td>合計</td>${COLS.map(c=>`<td class="td-mono">${catCnt[c]}件</td><td class="td-mono">${fmt(catTot[c])}</td>`).join('')}<td class="td-mono">${fmt(grand3+otherTot+goodsTot)}</td></tr></tbody></table></div>`;
+  let sm=`<div class="xls-summary"><table class="xls"><thead><tr>${COLS.map(c=>`<th style="background:${colBg[c]}">${c}</th>`).join('')}<th style="background:var(--bg3)">総合計</th></tr></thead><tbody><tr>${COLS.map(c=>`<td class="td-mono">${fy(catTot[c])}</td>`).join('')}<td class="td-mono"><strong>${fy(grand3)}</strong></td></tr><tr>${COLS.map(c=>`<td class="td-mono td-sub">${catCnt[c]}件</td>`).join('')}<td class="td-mono td-sub">${cnt3}件</td></tr></tbody></table></div>`;
+  let routes=[];visIds().forEach(id=>(storeRoutes(id)||[]).forEach(rk=>{if(!routes.includes(rk))routes.push(rk);}));if(!routes.length)routes=(db.cats.route||DEF_ROUTES);
+  const rstat={};routes.forEach(rk=>rstat[rk]={sC:0,sA:0,nC:0,nA:0});
+  all.forEach(r=>{const rk=r.route||'その他';if(!rstat[rk])rstat[rk]={sC:0,sA:0,nC:0,nA:0};if(r.type==='スポット'){rstat[rk].sC++;rstat[rk].sA+=r.amount;}else if(r.type==='新スポット'){rstat[rk].nC++;rstat[rk].nA+=r.amount;}});
+  const rkeys=Object.keys(rstat).filter(rk=>rstat[rk].sC||rstat[rk].nC);
+  let rtbl='';
+  if(rkeys.length){let tsC=0,tsA=0,tnC=0,tnA=0;
+    rtbl=`<div class="xls-route"><div class="xls-cap">獲得経路別（スポット・新スポット）</div><div style="overflow-x:auto"><table class="xls"><thead><tr><th rowspan="2">経路</th><th colspan="2" style="background:${colBg['スポット']}">スポット</th><th colspan="2" style="background:${colBg['新スポット']}">新スポット</th><th colspan="2" style="background:var(--bg3)">合計</th></tr><tr><th class="xh2">件</th><th class="xh2">金額</th><th class="xh2">件</th><th class="xh2">金額</th><th class="xh2">件</th><th class="xh2">金額</th></tr></thead><tbody>`;
+    rkeys.forEach(k=>{const s=rstat[k];tsC+=s.sC;tsA+=s.sA;tnC+=s.nC;tnA+=s.nA;rtbl+=`<tr><td>${k}</td><td class="td-mono">${s.sC||''}</td><td class="td-mono">${fmt(s.sA)}</td><td class="td-mono">${s.nC||''}</td><td class="td-mono">${fmt(s.nA)}</td><td class="td-mono">${(s.sC+s.nC)||''}</td><td class="td-mono">${fmt(s.sA+s.nA)}</td></tr>`;});
+    rtbl+=`<tr class="xsum"><td>合計</td><td class="td-mono">${tsC||''}</td><td class="td-mono">${fmt(tsA)}</td><td class="td-mono">${tnC||''}</td><td class="td-mono">${fmt(tnA)}</td><td class="td-mono">${(tsC+tnC)||''}</td><td class="td-mono">${fmt(tsA+tnA)}</td></tr></tbody></table></div></div>`;
+  }
+  const og=`<div class="xls-og"><div class="xls-box"><div class="xls-cap">その他売上</div><div class="td-mono" style="font-size:18px;font-weight:700">${fy(otherTot)}</div></div><div class="xls-box"><div class="xls-cap">商品売上</div><div class="td-mono" style="font-size:18px;font-weight:700">${fy(goodsTot)}</div></div></div>`;
+  const _bud=budgetForMonth(month,visIds());
+  const banner=month?budgetSummaryHTML(month,grand3+otherTot+goodsTot,_bud,'売上合計')+'<div style="height:14px"></div>':'';
+  const title=`<div style="font-size:15px;font-weight:700;margin-bottom:12px;">${month||'全期間'} 売上予定一覧</div>`;
+  document.getElementById('sales-list-content').innerHTML=(all.length?banner+title+g+sm+rtbl+og:'<p style="color:var(--text2);padding:20px;">データがありません</p>');
+}
 
 // DAILY LIST
 function renderDailyList(){const month=document.getElementById('filter-daily-month').value;let data=fbStore(db.daily);if(month)data=data.filter(d=>(d.date||'').startsWith(month));data=[...data].sort((a,b)=>b.date>a.date?1:-1);document.getElementById('daily-count-badge').textContent=data.length+'件';const wi={'晴れ':'☀️','曇り':'☁️','雨':'🌧','雪':'❄️'};document.getElementById('daily-list-tbody').innerHTML=data.length===0?'<tr><td colspan="11" style="color:var(--text2);text-align:center;padding:20px;">日報がありません</td></tr>':data.map(d=>`<tr><td>${d.date}</td><td class="td-sub">${gs(d.storeId).name}</td><td>${d.author||'—'}</td><td>${(wi[d.weather]||'')+' '+(d.weather||'')}</td><td class="td-mono">${(d.serviceRows||[]).filter(r=>r.name).length}件</td><td class="td-mono">${fy(dTotal(d))}</td><td class="td-mono td-sub">${fy(stTotal(d))}</td><td class="td-mono td-sub">${fy(partCost(d))}</td><td class="td-mono">${d.visit||0}</td><td class="td-mono">${d.estimate||0}</td><td class="td-actions"><button class="btn btn-danger btn-sm" onclick="delDaily('${d.id}')">削除</button></td></tr>`).join('');
