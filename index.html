@@ -171,9 +171,22 @@ tbody td{padding:10px 12px;color:var(--text);}
   <div class="topbar">
     <div class="topbar-title" id="topbar-title">ダッシュボード</div>
     <div class="topbar-right">
-      <div class="store-select-wrap" id="store-filter-wrap" style="display:none;"><span style="font-size:12px;color:var(--text2);">店舗:</span><select id="global-store-filter" onchange="onStoreFilterChange()"><option value="all">全店舗</option></select></div>
+      <div id="store-filter-wrap" style="display:none;align-items:center;gap:12px;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-size:11px;color:var(--text2);white-space:nowrap;">閲覧:</span>
+          <select id="global-store-filter" onchange="onViewFilterChange()" style="background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:4px 10px;color:var(--text);font-size:12px;font-family:'Noto Sans JP',sans-serif;outline:none;cursor:pointer;"></select>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-size:11px;color:var(--text2);white-space:nowrap;">入力:</span>
+          <select id="input-store-filter" onchange="onInputFilterChange()" style="background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:4px 10px;color:var(--text);font-size:12px;font-family:'Noto Sans JP',sans-serif;outline:none;cursor:pointer;"></select>
+        </div>
+      </div>
       <span id="topbar-date" class="badge"></span>
     </div>
+  </div>
+  <div id="current-store-banner" style="background:rgba(79,142,247,.08);border-bottom:1px solid var(--border);padding:8px 24px;display:flex;align-items:center;gap:10px;">
+    <span style="font-size:11px;color:var(--text2);">表示中：</span>
+    <span id="banner-store-name" style="font-size:15px;font-weight:700;color:var(--accent);"></span>
   </div>
   <div class="content">
 
@@ -440,7 +453,7 @@ async function sbUpsert(table,data){
 const DEF_CATS=['定期','スポット','新スポット','その他','商品'];
 const DEF_ROUTES=['DH','コールセンター','リピート','リコール','他部署紹介','他店紹介','お客様紹介','クレアス','ポスティング','DM','HP','その他','穴吹','湖光'];
 let db={stores:[],users:[],daily:[],monthly:[],cats:{service:[...DEF_CATS],route:[...DEF_ROUTES]}};
-let currentUser=null,activeStoreFilter='all';
+let currentUser=null,activeStoreFilter='all',activeInputStore='';
 let pendingSchedules=[]; // スケジュールから読み込んだデータ一時保存
 
 async function loadDB(){
@@ -500,6 +513,7 @@ function startApp(){
   document.getElementById('sb-role').textContent=RL[currentUser.role]||currentUser.role;document.getElementById('sb-avatar').textContent=currentUser.name.slice(0,1);
   document.getElementById('topbar-date').textContent=new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
   buildSidebar();buildStoreFilter();
+  updateStoreDisplay();
   document.getElementById('filter-month').value=thisMonth();document.getElementById('filter-daily-month').value=thisMonth();document.getElementById('admin-filter-month').value=thisMonth();
   showPage('dashboard');
 }
@@ -508,30 +522,65 @@ function ni(id,icon,label){return`<div class="nav-item" id="nav-${id}" onclick="
 function buildStoreFilter(){
   const r=currentUser.role;
   document.getElementById('store-filter-wrap').style.display='flex';
+  const myIds=currentUser.store_ids||currentUser.storeIds||[currentUser.storeId].filter(Boolean);
+  const myStores=db.stores.filter(s=>myIds.includes(s.id));
+
   if(r==='admin'||r==='manager'){
-    // admin/manager: 全店舗切り替え可
+    // 閲覧: 全店舗
     document.getElementById('global-store-filter').innerHTML='<option value="all">全店舗</option>'+db.stores.map(s=>`<option value="${s.id}">${s.name}${s.dept?' '+s.dept:''}</option>`).join('');
+    // 入力: 登録店のみ
+    document.getElementById('input-store-filter').innerHTML=myStores.map(s=>`<option value="${s.id}">${s.name}${s.dept?' '+s.dept:''}</option>`).join('');
   } else {
-    // general: 登録店のみ選択可
-    const myIds=currentUser.store_ids||currentUser.storeIds||[currentUser.storeId].filter(Boolean);
-    const myStores=db.stores.filter(s=>myIds.includes(s.id));
+    // general: 閲覧も入力も登録店のみ
     document.getElementById('global-store-filter').innerHTML=myStores.map(s=>`<option value="${s.id}">${s.name}${s.dept?' '+s.dept:''}</option>`).join('');
-    // generalはデフォルトで最初の登録店を選択
-    if(myStores.length>0){
-      activeStoreFilter=myStores[0].id;
-      document.getElementById('global-store-filter').value=myStores[0].id;
-    }
+    document.getElementById('input-store-filter').innerHTML=myStores.map(s=>`<option value="${s.id}">${s.name}${s.dept?' '+s.dept:''}</option>`).join('');
+  }
+
+  // デフォルト選択
+  if(myStores.length>0){
+    activeStoreFilter=r==='admin'?'all':myStores[0].id;
+    activeInputStore=myStores[0].id;
+    document.getElementById('global-store-filter').value=activeStoreFilter;
+    document.getElementById('input-store-filter').value=activeInputStore;
   }
 }
-function onStoreFilterChange(){
-  activeStoreFilter=document.getElementById('global-store-filter').value;
-  // 左上の店舗名も更新
-  if(activeStoreFilter==='all'){
-    document.getElementById('sb-store-name').textContent='全店舗';
-  } else {
-    const st=db.stores.find(s=>s.id===activeStoreFilter)||{};
-    document.getElementById('sb-store-name').textContent=(st.name||'—')+((st.dept&&st.dept.trim())?' '+st.dept.trim():'');
+function onInputFilterChange(){
+  activeInputStore=document.getElementById('input-store-filter').value;
+  updateStoreDisplay();
+  // デイリー入力フォームが開いてたら更新
+  const dStore=document.getElementById('d-store');
+  if(dStore)dStore.value=inputStoreName();
+  const mrStore=document.getElementById('mr-store');
+  if(mrStore)mrStore.value=inputStoreName();
+}
+
+function updateStoreDisplay(){
+  // 閲覧店舗名
+  let viewName='';
+  if(activeStoreFilter==='all'){viewName='全店舗';}
+  else{const st=db.stores.find(s=>s.id===activeStoreFilter)||{};viewName=(st.name||'—')+((st.dept&&st.dept.trim())?' '+st.dept.trim():'');}
+  // 入力店舗名
+  const ist=db.stores.find(s=>s.id===activeInputStore)||{};
+  const inputName=(ist.name||'—')+((ist.dept&&ist.dept.trim())?' '+ist.dept.trim():'');
+  // 左上: 入力店舗を表示
+  document.getElementById('sb-store-name').textContent=inputName;
+  // バナー: 閲覧と入力を両方表示
+  const banner=document.getElementById('banner-store-name');
+  if(banner){
+    if(viewName===inputName){
+      banner.textContent=inputName;
+    } else {
+      banner.innerHTML=`閲覧: <span style="color:var(--accent)">${viewName}</span>&nbsp;&nbsp;入力: <span style="color:var(--green)">${inputName}</span>`;
+    }
   }
+  // デイリー入力欄
+  const dStore=document.getElementById('d-store');if(dStore)dStore.value=inputStoreName();
+  const mrStore=document.getElementById('mr-store');if(mrStore)mrStore.value=inputStoreName();
+}
+
+function onViewFilterChange(){
+  activeStoreFilter=document.getElementById('global-store-filter').value;
+  updateStoreDisplay();
   // 現在表示中のページを再描画
   const activePage=document.querySelector('.page.active');
   if(!activePage)return;
@@ -599,6 +648,7 @@ function initDailyForm(){
   if(!document.getElementById('d-date').value)document.getElementById('d-date').value=today();
   document.getElementById('d-author').value=currentUser.name;
   document.getElementById('d-store').value=inputStoreName();
+  updateStoreDisplay();
   if(!document.getElementById('service-tbody').children.length){addServiceRow();addServiceRow();addServiceRow();}
   if(!document.getElementById('st-tbody').children.length)addSTRow();
   if(!document.getElementById('part-tbody').children.length)addPartRow();
@@ -816,20 +866,14 @@ function printSalesReport(){const month=document.getElementById('print-sales-sel
 function buildMPrint(m,storeName){const a=Number(m.actual)||0,b=Number(m.budget)||0,l=Number(m.lastyear)||0,c=Number(m.count)||0,rate=b>0?(a/b*100).toFixed(1)+'%':'—',vsL=l>0?(a/l*100).toFixed(1)+'%':'—',up=c>0?fy(Math.round(a/c)):'—';return`<div style="padding:8px 0;"><div style="border-bottom:2px solid var(--border);padding-bottom:12px;margin-bottom:16px;"><div style="font-size:19px;font-weight:700;margin-bottom:3px;">${m.month} 月間運営報告書</div><div style="font-size:12px;color:var(--text2);">${storeName}　報告日: ${m.reportDate||m.report_date||''}　担当: ${m.manager||''}</div></div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">${[['売上予算',fy(b)],['売上実績',fy(a)],['達成率',rate],['昨対比',vsL],['件数',c+'件'],['客単価',up]].map(([k,v])=>`<div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:11px 13px;"><div style="font-size:11px;color:var(--text2);margin-bottom:3px;">${k}</div><div style="font-size:16px;font-weight:600;font-family:'DM Mono',monospace;">${v}</div></div>`).join('')}</div><table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px;"><thead><tr><th style="text-align:left;padding:7px 10px;border:1px solid var(--border);background:var(--bg3);font-size:11px;">営業指標</th><th style="text-align:right;padding:7px 10px;border:1px solid var(--border);background:var(--bg3);font-size:11px;">件数</th></tr></thead><tbody>${[['見積',m.estimate],['訪問',m.visit],['TELアポ',m.tel],['ポスティング',m.posting],['新規契約',m.newContract||m.new_contract],['紹介',m.referral]].map(([k,v])=>`<tr><td style="padding:7px 10px;border:1px solid var(--border);">${k}</td><td style="text-align:right;padding:7px 10px;border:1px solid var(--border);">${v||0}</td></tr>`).join('')}</tbody></table>${[['4. 実施したこと',m.done],['5. 課題・改善点',m.issue],['6. 来月の活動予定',m.next]].filter(([,v])=>v).map(([k,v])=>`<div style="margin-bottom:12px;"><div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:5px;">${k}</div><div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:11px 13px;font-size:13px;line-height:1.7;white-space:pre-wrap;">${v}</div></div>`).join('')}</div>`;}
 function exportBackup(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(db,null,2)],{type:'application/json'}));a.download=`backup_${today()}.json`;a.click();URL.revokeObjectURL(a.href);toast('バックアップを保存しました');}
 
-// 入力用店舗ID（登録店の中で現在選択中の店舗）
+// 入力用店舗ID（入力セレクトで選んだ店舗）
 function inputStoreId(){
-  const r=currentUser.role;
-  if(r==='admin')return activeStoreFilter!=='all'?activeStoreFilter:currentUser.storeId;
-  // manager/general: フィルターで選んだ店舗（登録店の範囲内）
-  if(activeStoreFilter&&activeStoreFilter!=='all'){
-    const myIds=currentUser.store_ids||currentUser.storeIds||[currentUser.storeId].filter(Boolean);
-    if(myIds.includes(activeStoreFilter))return activeStoreFilter;
-  }
-  return currentUser.storeId;
+  return activeInputStore||currentUser.storeId;
 }
-// 入力用店舗名
+// 入力用店舗名（店舗名+部署）
 function inputStoreName(){
-  return (gs(inputStoreId()).name||'—');
+  const st=db.stores.find(s=>s.id===inputStoreId())||{};
+  return (st.name||'—')+((st.dept&&st.dept.trim())?' '+st.dept.trim():'');
 }
 
 function updStoreHidden(){
