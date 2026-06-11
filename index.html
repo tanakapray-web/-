@@ -890,13 +890,75 @@ async function renderSalesList(){
 }
 
 // DAILY LIST
-function renderDailyList(){const month=document.getElementById('filter-daily-month').value;let data=fbStore(db.daily);if(month)data=data.filter(d=>(d.date||'').startsWith(month));data=[...data].sort((a,b)=>b.date>a.date?1:-1);document.getElementById('daily-count-badge').textContent=data.length+'件';const wi={'晴れ':'☀️','曇り':'☁️','雨':'🌧','雪':'❄️'};document.getElementById('daily-list-tbody').innerHTML=data.length===0?'<tr><td colspan="11" style="color:var(--text2);text-align:center;padding:20px;">日報がありません</td></tr>':data.map(d=>`<tr><td>${d.date}</td><td class="td-sub">${gs(d.storeId).name}</td><td>${d.author||'—'}</td><td>${(wi[d.weather]||'')+' '+(d.weather||'')}</td><td class="td-mono">${(d.serviceRows||[]).filter(r=>r.name).length}件</td><td class="td-mono">${fy(dTotal(d))}</td><td class="td-mono td-sub">${fy(stTotal(d))}</td><td class="td-mono td-sub">${fy(partCost(d))}</td><td class="td-mono">${d.visit||0}</td><td class="td-mono">${d.estimate||0}</td><td class="td-actions"><button class="btn btn-danger btn-sm" onclick="delDaily('${d.id}')">削除</button></td></tr>`).join('');
+function renderDailyList(){const month=document.getElementById('filter-daily-month').value;let data=fbStore(db.daily);if(month)data=data.filter(d=>(d.date||'').startsWith(month));data=[...data].sort((a,b)=>b.date>a.date?1:-1);document.getElementById('daily-count-badge').textContent=data.length+'件';const wi={'晴れ':'☀️','曇り':'☁️','雨':'🌧','雪':'❄️'};document.getElementById('daily-list-tbody').innerHTML=data.length===0?'<tr><td colspan="11" style="color:var(--text2);text-align:center;padding:20px;">日報がありません</td></tr>':data.map(d=>`<tr><td>${d.date}</td><td class="td-sub">${gs(d.storeId).name}</td><td>${d.author||'—'}</td><td>${(wi[d.weather]||'')+' '+(d.weather||'')}</td><td class="td-mono">${(d.serviceRows||[]).filter(r=>r.name).length}件</td><td class="td-mono">${fy(dTotal(d))}</td><td class="td-mono td-sub">${fy(stTotal(d))}</td><td class="td-mono td-sub">${fy(partCost(d))}</td><td class="td-mono">${d.visit||0}</td><td class="td-mono">${d.estimate||0}</td><td class="td-actions"><button class="btn btn-ghost btn-sm" onclick="viewDaily('${d.id}')">詳細</button><button class="btn btn-danger btn-sm" onclick="delDaily('${d.id}')">削除</button></td></tr>`).join('');
   {const bm=document.getElementById('filter-daily-month').value||thisMonth();const td=today();const tot=fbStore(db.daily).filter(d=>(d.date||'').startsWith(bm)&&(d.date||'')<=td).reduce((a,d)=>a+dTotal(d),0);const bud=budgetForMonth(bm,visIds());const el=document.getElementById('daily-budget-banner');if(el)el.innerHTML=budgetSummaryHTML(bm,tot,bud,'当日までの合計');}
 }
 async function delDaily(id){if(!confirm('削除しますか？'))return;await sbDelete('daily','id=eq.'+id);db.daily=db.daily.filter(d=>d.id!==id);renderDailyList();toast('削除しました');}
 
 // MONTHLY LIST
 function renderMonthlyList(){const data=[...fbStore(db.monthly)].sort((a,b)=>b.month>a.month?1:-1);document.getElementById('monthly-list-count').textContent=data.length;document.getElementById('monthly-list-tbody').innerHTML=data.length===0?'<tr><td colspan="8" style="color:var(--text2);text-align:center;padding:20px;">月間報告がありません</td></tr>':data.map(m=>{const a=Number(m.actual)||0,b=Number(m.budget)||0,rate=b>0?(a/b*100).toFixed(1)+'%':'—',rc=b>0&&a>=b?'var(--green)':'var(--yellow)';return`<tr><td><strong>${m.month}</strong></td><td class="td-sub">${gs(m.storeId).name}</td><td>${m.manager||'—'}</td><td class="td-mono">${fy(b)}</td><td class="td-mono">${fy(a)}</td><td class="td-mono" style="color:${rc}">${rate}</td><td class="td-mono">${m.count||0}件</td><td class="td-actions"><button class="btn btn-ghost btn-sm" onclick="viewMonthly('${m.id}')">詳細</button><button class="btn btn-success btn-sm" onclick="viewMonthly('${m.id}')">🖨️</button><button class="btn btn-danger btn-sm" onclick="delMonthly('${m.id}')">削除</button></td></tr>`;}).join('');}
+function viewDaily(id){const d=db.daily.find(r=>r.id===id);if(!d)return;document.getElementById('print-content').innerHTML=buildDailyDetail(d,gs(d.storeId).name);document.getElementById('print-modal').classList.add('open');}
+function buildDailyDetail(d,storeName){
+  const wi={'晴れ':'☀️','曇り':'☁️','雨':'🌧','雪':'❄️'};
+  const svcTotal=( d.serviceRows||[]).reduce((a,r)=>a+(Number(r.amount)||0),0);
+  const otherTotal=(d.serviceRows||[]).reduce((a,r)=>a+(Number(r.otherSales)||0)+(Number(r.goodsSales)||0),0);
+  const stTot=stTotal(d),partTot=partCost(d);
+  const svcRows=(d.serviceRows||[]).filter(r=>r.name);
+  const stRows=(d.stRows||[]).filter(r=>r.name||r.payExTax);
+  const partRows=(d.partRows||[]).filter(r=>r.name||r.daily);
+  const card=(label,val)=>`<div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:11px 13px;"><div style="font-size:11px;color:var(--text2);margin-bottom:3px;">${label}</div><div style="font-size:16px;font-weight:600;font-family:'DM Mono',monospace;">${val}</div></div>`;
+  const th=v=>`<th style="text-align:left;padding:6px 10px;border:1px solid var(--border);background:var(--bg3);font-size:11px;">${v}</th>`;
+  const td=v=>`<td style="padding:6px 10px;border:1px solid var(--border);font-size:13px;">${v}</td>`;
+  const tdr=v=>`<td style="padding:6px 10px;border:1px solid var(--border);font-size:13px;text-align:right;font-family:'DM Mono',monospace;">${v}</td>`;
+  let html=`<div style="padding:8px 0;">`;
+  // ヘッダー
+  html+=`<div style="border-bottom:2px solid var(--border);padding-bottom:12px;margin-bottom:16px;">
+    <div style="font-size:19px;font-weight:700;margin-bottom:3px;">${d.date} 日報</div>
+    <div style="font-size:12px;color:var(--text2);">${storeName}　天候: ${(wi[d.weather]||'')+' '+(d.weather||'—')}　担当: ${d.author||'—'}</div>
+  </div>`;
+  // サマリーカード
+  html+=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
+    ${card('売上合計',fy(svcTotal))}
+    ${card('その他・商品',fy(otherTotal))}
+    ${card('ST支払',fy(stTot))}
+    ${card('パート人件費',fy(partTot))}
+    ${card('訪問件数',(d.visit||0)+'件')}
+    ${card('見積件数',(d.estimate||0)+'件')}
+  </div>`;
+  // サービス明細
+  if(svcRows.length){
+    html+=`<div style="margin-bottom:14px;font-size:12px;font-weight:600;color:var(--text2);">サービス・売上明細</div>`;
+    html+=`<table style="width:100%;border-collapse:collapse;margin-bottom:16px;"><thead><tr>
+      ${th('区分')}${th('顧客名')}${th('受注経路')}${th('売上(税抜)')}${th('その他売上')}${th('商品売上')}
+    </tr></thead><tbody>`;
+    svcRows.forEach(r=>{
+      html+=`<tr>${td(r.type||'—')}${td(r.name)}${td(r.route||'—')}${tdr(r.amount?fy(Number(r.amount)):'')}${tdr(r.otherSales?fy(Number(r.otherSales)):'')}${tdr(r.goodsSales?fy(Number(r.goodsSales)):'')}</tr>`;
+    });
+    html+=`<tr style="background:var(--bg3);font-weight:700;"><td colspan="3" style="padding:6px 10px;border:1px solid var(--border);font-size:13px;">小計</td>${tdr(fy(svcTotal))}${tdr(fy(otherTotal))}${tdr('')}</tr>`;
+    html+=`</tbody></table>`;
+  }
+  // ST支払い
+  if(stRows.length){
+    html+=`<div style="margin-bottom:14px;font-size:12px;font-weight:600;color:var(--text2);">ST支払い</div>`;
+    html+=`<table style="width:100%;border-collapse:collapse;margin-bottom:16px;"><thead><tr>${th('氏名')}${th('支払額(税抜)')}${th('備考')}</tr></thead><tbody>`;
+    stRows.forEach(r=>{html+=`<tr>${td(r.name||'—')}${tdr(r.payExTax?fy(Number(r.payExTax)):'')}${td(r.note||'')}</tr>`;});
+    html+=`</tbody></table>`;
+  }
+  // パート人件費
+  if(partRows.length){
+    html+=`<div style="margin-bottom:14px;font-size:12px;font-weight:600;color:var(--text2);">パート人件費</div>`;
+    html+=`<table style="width:100%;border-collapse:collapse;margin-bottom:16px;"><thead><tr>${th('氏名')}${th('日当')}${th('交通費')}${th('備考')}</tr></thead><tbody>`;
+    partRows.forEach(r=>{html+=`<tr>${td(r.name||'—')}${tdr(r.daily?fy(Number(r.daily)):'')}${tdr(r.transport?fy(Number(r.transport)):'')}${td(r.note||'')}</tr>`;});
+    html+=`</tbody></table>`;
+  }
+  // メモ・所見
+  if(d.note||d.memo){
+    html+=`<div style="margin-bottom:8px;font-size:12px;font-weight:600;color:var(--text2);">メモ・所見</div>`;
+    html+=`<div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:11px 13px;font-size:13px;line-height:1.7;white-space:pre-wrap;">${d.note||d.memo}</div>`;
+  }
+  html+=`</div>`;
+  return html;
+}
 function viewMonthly(id){const m=db.monthly.find(r=>r.id===id);if(!m)return;document.getElementById('print-content').innerHTML=buildMPrint(m,gs(m.storeId).name);document.getElementById('print-modal').classList.add('open');}
 async function delMonthly(id){if(!confirm('削除しますか？'))return;await sbDelete('monthly','id=eq.'+id);db.monthly=db.monthly.filter(m=>m.id!==id);renderMonthlyList();toast('削除しました');}
 
