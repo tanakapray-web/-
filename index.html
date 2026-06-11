@@ -96,6 +96,18 @@ tbody td{padding:10px 12px;color:var(--text);}
 .pill-red{background:rgba(248,113,113,.15);color:var(--red);}
 .pill-purple{background:rgba(124,92,252,.15);color:var(--accent2);}
 .pill-gray{background:rgba(136,146,164,.15);color:var(--text2);}
+/* 清掃台帳 */
+.cl-table{border-collapse:collapse;width:100%;font-size:13px;margin-bottom:0;}
+.cl-table th{background:var(--bg3);padding:7px 10px;border:1px solid var(--border);text-align:left;font-size:11px;white-space:nowrap;}
+.cl-table td{padding:6px 10px;border:1px solid var(--border);vertical-align:middle;}
+.cl-parent td{background:var(--bg3);font-weight:600;}
+.cl-child td:first-child{padding-left:28px;color:var(--text2);}
+.cl-input{width:70px;text-align:right;padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);font-size:13px;font-family:'DM Mono',monospace;color:var(--text);}
+.cl-amtinput{width:110px;text-align:right;padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);font-size:13px;font-family:'DM Mono',monospace;color:var(--text);}
+.cl-noteinput{width:120px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);font-size:12px;color:var(--text);font-family:inherit;}
+.cl-mono{text-align:right;font-family:'DM Mono',monospace;white-space:nowrap;}
+.cl-sum td{background:var(--accent);color:#fff;font-weight:700;}
+.cl-ttag{font-size:10px;padding:2px 6px;border-radius:4px;white-space:nowrap;}
 .bsum-row{display:flex;flex-wrap:wrap;gap:10px;}
 .bsum-card{flex:1;min-width:120px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 14px;}
 .bsum-k{font-size:11px;color:var(--text2);margin-bottom:3px;}
@@ -397,6 +409,30 @@ tbody td{padding:10px 12px;color:var(--text);}
     </div>
 
     <!-- EXPORT -->
+    <!-- 清掃台帳 -->
+    <div class="page" id="page-cleaning">
+      <div class="page-header"><h1>清掃台帳</h1><p>日常清掃の得意先ごとに月次売上を管理。月間運営報告の実績に自動反映されます。</p></div>
+      <div class="card">
+        <div style="display:flex;gap:8px;margin-bottom:18px;">
+          <button id="cl-tab-monthly" class="btn btn-primary btn-sm" onclick="showCleaningTab('monthly')">月次入力</button>
+          <button id="cl-tab-masters" class="btn btn-ghost btn-sm" onclick="showCleaningTab('masters')">マスタ管理</button>
+        </div>
+        <!-- 月次入力 -->
+        <div id="cl-monthly-view">
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;">
+            <div class="form-group" style="max-width:160px;margin:0;"><label class="form-label">対象月</label><input type="month" class="form-input" id="cl-month" onchange="renderCleaningMonthly()"></div>
+            <button class="btn btn-primary" onclick="saveAllCleaningMonthly()">💾 一括保存</button>
+          </div>
+          <div id="cl-monthly-body"></div>
+        </div>
+        <!-- マスタ管理 -->
+        <div id="cl-masters-view" style="display:none;">
+          <button class="btn btn-primary" style="margin-bottom:16px;" onclick="openCleaningMasterModal()">＋ 得意先を追加</button>
+          <div id="cl-masters-body"></div>
+        </div>
+      </div>
+    </div>
+
     <div class="page" id="page-export">
       <div class="page-header"><h1>エクスポート</h1></div>
       <div class="export-card"><div class="export-icon">📊</div><div class="export-info"><div class="export-title">売上データ CSV</div></div><div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;"><select class="form-select" id="export-sales-month" style="width:160px;"><option value="">すべての月</option></select><button class="btn btn-primary" onclick="exportSalesCSV()">⬇️ CSV</button></div></div>
@@ -465,6 +501,28 @@ tbody td{padding:10px 12px;color:var(--text);}
 </div>
 
 <!-- PRINT MODAL -->
+<div class="modal-overlay" id="cleaning-master-modal">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title" id="cl-modal-title">得意先を追加</div><button class="modal-close" onclick="closeModal('cleaning-master-modal')">✕</button></div>
+    <div style="padding:0 4px;">
+      <div class="form-group"><label class="form-label">店舗・部署 *</label><select class="form-input" id="cl-store-sel"></select></div>
+      <div class="form-group"><label class="form-label">得意先名 *</label><input type="text" class="form-input" id="cl-name" placeholder="例: 積水化学工業(株)水口工場 本館棟"></div>
+      <div style="display:flex;gap:12px;">
+        <div class="form-group" style="flex:1"><label class="form-label">契約No</label><input type="text" class="form-input" id="cl-no" placeholder="例: 1001970"></div>
+        <div class="form-group" style="flex:1"><label class="form-label">並び順</label><input type="number" class="form-input" id="cl-order" placeholder="10"></div>
+      </div>
+      <div style="display:flex;gap:12px;">
+        <div class="form-group" style="flex:1"><label class="form-label">契約種別</label><select class="form-input" id="cl-type"><option value="定額">定額</option><option value="回数制">回数制</option><option value="スポット">スポット</option><option value="その他売上">その他売上</option><option value="商品売上">商品売上</option></select></div>
+        <div class="form-group" style="flex:1"><label class="form-label">単価（税抜）</label><input type="number" class="form-input" id="cl-price" placeholder="例: 120400"></div>
+      </div>
+      <div class="form-group"><label class="form-label">親契約（サブ契約の場合）</label><select class="form-input" id="cl-parent"><option value="">なし（親契約）</option></select></div>
+      <div class="form-group"><label class="form-label">備考</label><input type="text" class="form-input" id="cl-note" placeholder="例: 2026.4より金額変更"></div>
+      <input type="hidden" id="cl-edit-id">
+      <div class="modal-btns"><button class="btn" onclick="closeModal('cleaning-master-modal')">キャンセル</button><button class="btn btn-primary" onclick="saveCleaningMaster()">保存</button></div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="print-modal">
   <div class="modal"><div class="modal-header no-print"><div class="modal-title">印刷プレビュー</div><div style="display:flex;gap:8px;"><button class="btn btn-primary" onclick="window.print()">🖨️ 印刷 / PDF</button><button class="modal-close" onclick="closePrintModal()">✕ 閉じる</button></div></div><div class="print-area" id="print-content"></div></div>
 </div>
@@ -506,7 +564,7 @@ async function sbUpsert(table,data){
 
 const DEF_CATS=['定期','スポット','新スポット','その他','商品'];
 const DEF_ROUTES=['DH','コールセンター','リピート','リコール','他部署紹介','他店紹介','お客様紹介','クレアス','ポスティング','DM','HP','その他','穴吹','湖光'];
-let db={stores:[],users:[],daily:[],monthly:[],cats:{service:[...DEF_CATS],route:[...DEF_ROUTES]}};
+let db={stores:[],users:[],daily:[],monthly:[],cats:{service:[...DEF_CATS],route:[...DEF_ROUTES]},cleaning_masters:[],cleaning_monthly:[]};
 let currentUser=null,activeStoreFilter='all',activeInputStore='';
 let pendingSchedules=[]; // スケジュールから読み込んだデータ一時保存
 
@@ -571,7 +629,7 @@ function startApp(){
   document.getElementById('filter-month').value=thisMonth();document.getElementById('filter-daily-month').value=thisMonth();document.getElementById('admin-filter-month').value=thisMonth();
   showPage('dashboard');
 }
-function buildSidebar(){const r=currentUser.role;let h='';h+=`<div class="nav-label">メイン</div>${ni('dashboard','📊','ダッシュボード')}`;h+=`<div class="nav-label">入力</div>${ni('daily','📝','デイリーレポート')}`;if(r!=='general'){h+=ni('monthly-report','📋','月間運営報告');h+=`<div class="nav-label">閲覧</div>${ni('sales-list','📈','売上予定一覧')}${ni('daily-list','🗂️','日報一覧')}${ni('monthly-list','📑','月間報告一覧')}`;h+=`<div class="nav-label">ツール</div>${ni('export','⬇️','エクスポート')}${ni('store-routes','🛣️','経路設定')}${ni('budget','💰','予算設定')}`;}if(r==='admin')h+=`<div class="nav-label">管理者</div>${ni('admin-stores','🏢','店舗管理')}${ni('admin-users','👥','アカウント管理')}${ni('admin-sales','📊','全店舗 売上')}${ni('admin-settings','⚙️','マスタ設定')}`;document.getElementById('sidebar-nav').innerHTML=h;}
+function buildSidebar(){const r=currentUser.role;let h='';h+=`<div class="nav-label">メイン</div>${ni('dashboard','📊','ダッシュボード')}`;h+=`<div class="nav-label">入力</div>${ni('daily','📝','デイリーレポート')}`;if(r!=='general'){h+=ni('monthly-report','📋','月間運営報告');h+=`<div class="nav-label">閲覧</div>${ni('sales-list','📈','売上予定一覧')}${ni('daily-list','🗂️','日報一覧')}${ni('monthly-list','📑','月間報告一覧')}`;h+=`<div class="nav-label">ツール</div>${ni('export','⬇️','エクスポート')}${ni('cleaning','🧹','清掃台帳')}${ni('store-routes','🛣️','経路設定')}${ni('budget','💰','予算設定')}`;}if(r==='admin')h+=`<div class="nav-label">管理者</div>${ni('admin-stores','🏢','店舗管理')}${ni('admin-users','👥','アカウント管理')}${ni('admin-sales','📊','全店舗 売上')}${ni('admin-settings','⚙️','マスタ設定')}`;document.getElementById('sidebar-nav').innerHTML=h;}
 function ni(id,icon,label){return`<div class="nav-item" id="nav-${id}" onclick="showPage('${id}')"><span class="nav-icon">${icon}</span>${label}</div>`;}
 function buildStoreFilter(){
   const r=currentUser.role;
@@ -646,15 +704,15 @@ function onViewFilterChange(){
   else if(id==='admin-sales')renderAdminSales();
   else if(id==='daily')initDailyForm();
 }
-const PT={'dashboard':'ダッシュボード','daily':'デイリーレポート入力','monthly-report':'月間運営報告','sales-list':'売上予定一覧','daily-list':'日報一覧','monthly-list':'月間運営報告一覧','export':'エクスポート','store-routes':'スポット獲得経路の設定','budget':'予算設定','admin-stores':'店舗管理','admin-users':'アカウント管理','admin-sales':'全店舗 売上報告','admin-settings':'マスタ設定'};
+const PT={'dashboard':'ダッシュボード','daily':'デイリーレポート入力','monthly-report':'月間運営報告','sales-list':'売上予定一覧','daily-list':'日報一覧','monthly-list':'月間報告一覧','export':'エクスポート','cleaning':'清掃台帳','store-routes':'スポット獲得経路の設定','budget':'予算設定','admin-stores':'店舗管理','admin-users':'アカウント管理','admin-sales':'全店舗 売上報告','admin-settings':'マスタ設定'};
 function showPage(id){
   const r=currentUser.role;
-  if(['monthly-report','sales-list','daily-list','monthly-list','export','store-routes','budget'].includes(id)&&r==='general')return;
+  if(['monthly-report','sales-list','daily-list','monthly-list','export','cleaning','store-routes','budget'].includes(id)&&r==='general')return;
   if(['admin-stores','admin-users','admin-sales','admin-settings'].includes(id)&&r!=='admin')return;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const pg=document.getElementById('page-'+id);if(pg)pg.classList.add('active');const nv=document.getElementById('nav-'+id);if(nv)nv.classList.add('active');
   document.getElementById('topbar-title').textContent=PT[id]||id;
-  if(id==='dashboard')renderDashboard();else if(id==='daily')initDailyForm();else if(id==='monthly-report')initMonthlyForm();else if(id==='sales-list')renderSalesList().catch(console.error);else if(id==='daily-list')renderDailyList();else if(id==='monthly-list')renderMonthlyList();else if(id==='export')initExportPage();else if(id==='store-routes')initStoreRoutes();else if(id==='budget')initBudgets();else if(id==='admin-stores')renderStores();else if(id==='admin-users')renderUsers();else if(id==='admin-sales')renderAdminSales();else if(id==='admin-settings')renderSettings();
+  if(id==='dashboard')renderDashboard();else if(id==='daily')initDailyForm();else if(id==='monthly-report')initMonthlyForm();else if(id==='sales-list')renderSalesList().catch(console.error);else if(id==='daily-list')renderDailyList();else if(id==='monthly-list')renderMonthlyList();else if(id==='export')initExportPage();else if(id==='cleaning')initCleaningPage();else if(id==='store-routes')initStoreRoutes();else if(id==='budget')initBudgets();else if(id==='admin-stores')renderStores();else if(id==='admin-users')renderUsers();else if(id==='admin-sales')renderAdminSales();else if(id==='admin-settings')renderSettings();
 }
 function visIds(){
   const r=currentUser.role;
@@ -818,7 +876,10 @@ function clearDaily(){document.getElementById('service-tbody').innerHTML='';docu
 // MONTHLY
 function initMonthlyForm(){if(!document.getElementById('mr-month').value)document.getElementById('mr-month').value=thisMonth();if(!document.getElementById('mr-report-date').value)document.getElementById('mr-report-date').value=today();document.getElementById('mr-manager').value=currentUser.name;document.getElementById('mr-store').value=inputStoreName();autoFillMonthly();}
 function autoFillMonthly(){const month=document.getElementById('mr-month').value;if(!month)return;const dailies=db.daily.filter(d=>d.storeId===inputStoreId()&&(d.date||'').startsWith(month));let tot=0,cnt=0,pc=0,stPay=0,vis=0,est=0,con=0,tel=0,pos=0,ref=0;const byT={};dailies.forEach(d=>{(d.serviceRows||[]).forEach(r=>{if(!r.name)return;cnt++;const a=(Number(r.amount)||0)+(Number(r.otherSales)||0)+(Number(r.goodsSales)||0);tot+=a;const t=r.type||'その他';byT[t]=(byT[t]||0)+(Number(r.amount)||0);if(Number(r.otherSales)>0)byT['その他売上']=(byT['その他売上']||0)+(Number(r.otherSales)||0);if(Number(r.goodsSales)>0)byT['商品売上']=(byT['商品売上']||0)+(Number(r.goodsSales)||0);});stPay+=stTotal(d);pc+=partCnt(d);vis+=Number(d.visit)||0;est+=Number(d.estimate)||0;con+=Number(d.contract)||0;tel+=Number(d.tel)||0;pos+=Number(d.posting)||0;ref+=Number(d.referral)||0;});
-  document.getElementById('mr-actual').value=tot||'';document.getElementById('mr-count').value=cnt||'';document.getElementById('mr-part').value=pc||'';document.getElementById('mr-est').value=est||'';document.getElementById('mr-visit').value=vis||'';document.getElementById('mr-tel').value=tel||'';document.getElementById('mr-post').value=pos||'';document.getElementById('mr-new').value=con||'';document.getElementById('mr-ref').value=ref||'';document.getElementById('mr-st-total').textContent=fy(stPay);
+  document.getElementById('mr-actual').value=tot||'';
+  // 清掃台帳の合計があれば上乗せ
+  const _clt=getCleaningTotal(inputStoreId(),month);
+  if(_clt>0){const _cur=Number(document.getElementById('mr-actual').value)||0;document.getElementById('mr-actual').value=_cur+_clt||'';}document.getElementById('mr-count').value=cnt||'';document.getElementById('mr-part').value=pc||'';document.getElementById('mr-est').value=est||'';document.getElementById('mr-visit').value=vis||'';document.getElementById('mr-tel').value=tel||'';document.getElementById('mr-post').value=pos||'';document.getElementById('mr-new').value=con||'';document.getElementById('mr-ref').value=ref||'';document.getElementById('mr-st-total').textContent=fy(stPay);
   const cats=db.cats.service||DEF_CATS;const col=Math.min(cats.length,4);const bg=document.getElementById('mr-breakdown-grid');bg.style.gridTemplateColumns=`repeat(${col},1fr)`;bg.innerHTML=cats.map(c=>`<div class="summary-item"><div class="summary-key">${c}</div><div class="summary-val" style="font-size:14px;">${fy(byT[c]||0)}</div></div>`).join('');calcMonthly();
   const saved=db.monthly.find(x=>x.month===month&&x.storeId===currentUser.storeId);
   if(saved){if(saved.budget)document.getElementById('mr-budget').value=saved.budget;if(saved.lastyear)document.getElementById('mr-lastyear').value=saved.lastyear;if(saved.zatsuRate||saved.zatsu_rate)document.getElementById('mr-zatsu-rate').value=saved.zatsuRate||saved.zatsu_rate;if(saved.newContractAmt||saved.new_contract_amt)document.getElementById('mr-new-amt').value=saved.newContractAmt||saved.new_contract_amt;if(saved.referralRcv||saved.referral_rcv)document.getElementById('mr-ref-rcv').value=saved.referralRcv||saved.referral_rcv;['done','issue','next'].forEach(k=>{if(saved[k])document.getElementById('mr-'+k).value=saved[k];});}
@@ -1022,6 +1083,125 @@ function editBudget(m){const s=curBudgetStore();document.getElementById('budget-
 async function persistBudgets(s){const r=await sbUpdate('stores','id=eq.'+s.id,{budgets:s.budgets});if(r===null){toast('保存に失敗しました。storesテーブルにbudgets列が必要です');return false;}return true;}
 async function saveBudget(){const s=curBudgetStore();if(!s)return;const m=document.getElementById('budget-month').value;const amt=Number(document.getElementById('budget-amount').value)||0;if(!m){alert('対象月を選んでください');return;}if(amt<=0){alert('予算額を入力してください');return;}const prev=s.budgets?{...s.budgets}:undefined;s.budgets={...(s.budgets||{}),[m]:amt};if(await persistBudgets(s)){document.getElementById('budget-amount').value='';renderBudgets();toast('予算を保存しました');}else{s.budgets=prev;}}
 async function delBudget(m){const s=curBudgetStore();if(!s||!s.budgets)return;if(!confirm(m+' の予算を削除しますか？'))return;const prev={...s.budgets};const nb={...s.budgets};delete nb[m];s.budgets=nb;if(await persistBudgets(s)){renderBudgets();toast('削除しました');}else{s.budgets=prev;}}
+// ===== 清掃台帳 =====
+function myCleaningStores(){if(currentUser.role==='admin')return db.stores;const ids=currentUser.store_ids||currentUser.storeIds||[currentUser.storeId].filter(Boolean);return db.stores.filter(s=>ids.includes(s.id));}
+function clVisIds(){if(currentUser.role==='admin'){const f=document.getElementById('store-filter');return f&&f.value?[f.value]:db.stores.map(s=>s.id);}return currentUser.store_ids||currentUser.storeIds||[currentUser.storeId].filter(Boolean);}
+function getCleaningTotal(storeId,month){if(!db.cleaning_masters||!db.cleaning_monthly)return 0;const masters=db.cleaning_masters.filter(m=>m.store_id===storeId&&m.active!==false);const recs={};db.cleaning_monthly.filter(r=>r.month===month&&r.store_id===storeId).forEach(r=>recs[r.master_id]=r);return masters.reduce((sum,m)=>{const r=recs[m.id];const t=m.contract_type||'定額';const count=r?Number(r.count)||0:(t==='定額'?1:0);return sum+(r&&r.amount_override!=null?Number(r.amount_override):Math.round(Number(m.unit_price||0)*count));},0);}
+async function initCleaningPage(){
+  try{const[ms,mo]=await Promise.all([sbFetch('cleaning_masters','order=sort_order.asc'),sbFetch('cleaning_monthly','')]);db.cleaning_masters=ms||[];db.cleaning_monthly=mo||[];}catch(e){db.cleaning_masters=db.cleaning_masters||[];db.cleaning_monthly=db.cleaning_monthly||[];}
+  if(!document.getElementById('cl-month').value)document.getElementById('cl-month').value=thisMonth();
+  showCleaningTab('monthly');
+}
+function showCleaningTab(tab){
+  document.getElementById('cl-monthly-view').style.display=tab==='monthly'?'':'none';
+  document.getElementById('cl-masters-view').style.display=tab==='masters'?'':'none';
+  document.getElementById('cl-tab-monthly').className='btn btn-sm '+(tab==='monthly'?'btn-primary':'btn-ghost');
+  document.getElementById('cl-tab-masters').className='btn btn-sm '+(tab==='masters'?'btn-primary':'btn-ghost');
+  if(tab==='monthly')renderCleaningMonthly();else renderCleaningMasters();
+}
+const CL_TYPE_STYLE={'定額':'background:rgba(47,116,208,.12);color:var(--accent)','回数制':'background:rgba(29,110,90,.12);color:var(--green)','スポット':'background:rgba(176,125,0,.12);color:var(--yellow)','その他売上':'background:rgba(136,146,164,.15);color:var(--text2)','商品売上':'background:rgba(124,92,252,.12);color:var(--accent2)'};
+function renderCleaningMonthly(){
+  const month=document.getElementById('cl-month').value;
+  const sids=clVisIds();
+  const masters=db.cleaning_masters.filter(m=>sids.includes(m.store_id)&&m.active!==false);
+  const body=document.getElementById('cl-monthly-body');
+  if(!masters.length){body.innerHTML='<p style="color:var(--text2);padding:16px 0;">得意先が登録されていません。「マスタ管理」から追加してください。</p>';return;}
+  const recs={};db.cleaning_monthly.filter(r=>r.month===month&&sids.includes(r.store_id)).forEach(r=>recs[r.master_id]=r);
+  const parents=masters.filter(m=>!m.parent_id);
+  const childMap={};masters.filter(m=>m.parent_id).forEach(m=>{if(!childMap[m.parent_id])childMap[m.parent_id]=[];childMap[m.parent_id].push(m);});
+  let html=`<div style="overflow-x:auto"><table class="cl-table"><thead><tr><th style="min-width:200px">得意先名</th><th>種別</th><th class="cl-mono">単価(税抜)</th><th class="cl-mono">回数</th><th class="cl-mono" style="min-width:110px">実績(税抜)</th><th class="cl-mono">消費税</th><th class="cl-mono">税込合計</th><th>備考</th></tr></thead><tbody id="cl-tbody">`;
+  let grandBase=0;
+  const rowHtml=(m,isChild)=>{
+    const r=recs[m.id];const t=m.contract_type||'定額';
+    const isFixed=t==='定額';const isManual=t==='スポット'||t==='その他売上'||t==='商品売上';
+    const defCount=isFixed?1:0;
+    const count=r?Number(r.count)||0:defCount;
+    const base=r&&r.amount_override!=null?Number(r.amount_override):Math.round(Number(m.unit_price||0)*count);
+    const tax=Math.floor(base*0.1);grandBase+=base;
+    const style=CL_TYPE_STYLE[t]||'';
+    const countCell=isFixed?`<span style="font-family:'DM Mono',monospace;">1</span>`:`<input type="number" class="cl-input" id="cln-${m.id}" value="${count}" min="0" oninput="calcClRow('${m.id}',${Number(m.unit_price||0)},this.value)">`;
+    const baseCell=isManual?`<input type="number" class="cl-amtinput" id="clb-${m.id}" value="${base||''}" min="0" oninput="calcClRowBase('${m.id}',this.value)">`:`<span id="clb-${m.id}" class="cl-mono">${base?fy(base):''}</span>`;
+    return`<tr class="${isChild?'cl-child':'cl-parent'}" data-mid="${m.id}">
+      <td>${isChild?'〃 ':''}${m.name}${m.contract_no?` <span style="font-size:10px;color:var(--text3)">${m.contract_no}</span>`:''}${m.note?`<div style="font-size:10px;color:var(--yellow);margin-top:1px;">${m.note}</div>`:''}</td>
+      <td><span class="cl-ttag" style="${style}">${t}</span></td>
+      <td class="cl-mono">${m.unit_price?fy(Number(m.unit_price)):''}</td>
+      <td style="text-align:right">${countCell}</td>
+      <td>${baseCell}</td>
+      <td class="cl-mono" id="clt-${m.id}">${tax?fy(tax):''}</td>
+      <td class="cl-mono" id="clh-${m.id}">${(base+tax)?fy(base+tax):''}</td>
+      <td><input type="text" class="cl-noteinput" id="clnote-${m.id}" value="${(r&&r.note)||''}" placeholder="備考"></td>
+    </tr>`;
+  };
+  parents.forEach(p=>{html+=rowHtml(p,false);(childMap[p.id]||[]).forEach(c=>{html+=rowHtml(c,true);});});
+  const gt=Math.floor(grandBase*0.1);
+  html+=`<tr class="cl-sum"><td colspan="4" style="text-align:left;">合計</td><td class="cl-mono">${fy(grandBase)}</td><td class="cl-mono">${fy(gt)}</td><td class="cl-mono">${fy(grandBase+gt)}</td><td></td></tr>`;
+  html+=`</tbody></table></div>`;
+  html+=`<div style="margin-top:12px;padding:12px 16px;background:rgba(29,110,90,.08);border:1px solid rgba(29,110,90,.2);border-radius:10px;font-size:13px;">📊 税抜合計: <strong style="font-family:'DM Mono',monospace;font-size:15px;">${fy(grandBase)}</strong>　→ 月間運営報告の「売上実績」に「一括保存」後に自動上乗せされます</div>`;
+  body.innerHTML=html;
+}
+function calcClRow(mid,unitPrice,countVal){const count=Number(countVal)||0;const base=Math.round(unitPrice*count);const tax=Math.floor(base*0.1);const be=document.getElementById('clb-'+mid);if(be&&be.tagName!=='INPUT')be.textContent=base?fy(base):'';document.getElementById('clt-'+mid).textContent=tax?fy(tax):'';document.getElementById('clh-'+mid).textContent=(base+tax)?fy(base+tax):'';}
+function calcClRowBase(mid,val){const base=Number(val)||0;const tax=Math.floor(base*0.1);document.getElementById('clt-'+mid).textContent=tax?fy(tax):'';document.getElementById('clh-'+mid).textContent=(base+tax)?fy(base+tax):'';}
+async function saveAllCleaningMonthly(){
+  const month=document.getElementById('cl-month').value;if(!month){alert('対象月を選んでください');return;}
+  const sids=clVisIds();
+  const masters=db.cleaning_masters.filter(m=>sids.includes(m.store_id)&&m.active!==false);
+  for(const m of masters){
+    const t=m.contract_type||'定額';const isFixed=t==='定額';const isManual=t==='スポット'||t==='その他売上'||t==='商品売上';
+    const count=isFixed?1:Number(document.getElementById('cln-'+m.id)?.value||0);
+    let amountOverride=null;
+    if(isManual){const el=document.getElementById('clb-'+m.id);if(el)amountOverride=Number(el.value)||0;}
+    const note=document.getElementById('clnote-'+m.id)?.value||'';
+    const rec={master_id:m.id,store_id:m.store_id,month,count,amount_override:amountOverride,note};
+    const existing=db.cleaning_monthly.find(r=>r.master_id===m.id&&r.month===month);
+    if(existing){await sbUpdate('cleaning_monthly','id=eq.'+existing.id,rec);Object.assign(existing,rec);}
+    else{const nr={...rec,id:uid()};const res=await sbInsert('cleaning_monthly',nr);if(res!==null)db.cleaning_monthly.push(nr);}
+  }
+  toast(`${masters.length}件 保存しました`);renderCleaningMonthly();
+}
+function renderCleaningMasters(){
+  const sids=clVisIds();
+  const masters=db.cleaning_masters.filter(m=>sids.includes(m.store_id));
+  const body=document.getElementById('cl-masters-body');
+  if(!masters.length){body.innerHTML='<p style="color:var(--text2);">得意先が登録されていません。</p>';return;}
+  const parents=masters.filter(m=>!m.parent_id);const childMap={};masters.filter(m=>m.parent_id).forEach(m=>{if(!childMap[m.parent_id])childMap[m.parent_id]=[];childMap[m.parent_id].push(m);});
+  let html='<div style="overflow-x:auto"><table class="cl-table"><thead><tr><th style="min-width:200px">得意先名</th><th>契約No</th><th>種別</th><th class="cl-mono">単価(税抜)</th><th>備考</th><th>操作</th></tr></thead><tbody>';
+  const row=(m,c)=>`<tr><td style="${c?'padding-left:28px;color:var(--text2)':''}">${m.name}</td><td style="font-size:12px;color:var(--text3)">${m.contract_no||''}</td><td><span class="cl-ttag" style="${CL_TYPE_STYLE[m.contract_type||'定額']||''}">${m.contract_type||'定額'}</span></td><td class="cl-mono">${m.unit_price?fy(Number(m.unit_price)):''}</td><td style="font-size:12px;color:var(--text2)">${m.note||''}</td><td class="td-actions"><button class="btn btn-ghost btn-sm" onclick="openCleaningMasterModal('${m.id}')">編集</button><button class="btn btn-danger btn-sm" onclick="deleteCleaningMaster('${m.id}')">削除</button></td></tr>`;
+  parents.forEach(p=>{html+=row(p,false);(childMap[p.id]||[]).forEach(c=>{html+=row(c,true);});});
+  html+='</tbody></table></div>';body.innerHTML=html;
+}
+function openCleaningMasterModal(id){
+  const m=id?db.cleaning_masters.find(x=>x.id===id):null;
+  document.getElementById('cl-modal-title').textContent=m?'得意先を編集':'得意先を追加';
+  document.getElementById('cl-name').value=m?m.name:'';
+  document.getElementById('cl-no').value=m?m.contract_no||'':'';
+  document.getElementById('cl-type').value=m?m.contract_type||'定額':'定額';
+  document.getElementById('cl-price').value=m?m.unit_price||'':'';
+  document.getElementById('cl-order').value=m?m.sort_order||'':'';
+  document.getElementById('cl-note').value=m?m.note||'':'';
+  document.getElementById('cl-edit-id').value=id||'';
+  const sids=clVisIds();
+  const parents=db.cleaning_masters.filter(x=>sids.includes(x.store_id)&&!x.parent_id&&x.id!==id);
+  document.getElementById('cl-parent').innerHTML='<option value="">なし（親契約）</option>'+parents.map(p=>`<option value="${p.id}"${m&&m.parent_id===p.id?' selected':''}>${p.name}</option>`).join('');
+  document.getElementById('cl-store-sel').innerHTML=myCleaningStores().map(s=>`<option value="${s.id}"${m&&m.store_id===s.id?' selected':''}>${s.name}${s.dept?' '+s.dept:''}</option>`).join('');
+  document.getElementById('cleaning-master-modal').classList.add('open');
+}
+async function saveCleaningMaster(){
+  const name=document.getElementById('cl-name').value.trim();if(!name){alert('得意先名を入力してください');return;}
+  const eid=document.getElementById('cl-edit-id').value;
+  const rec={name,contract_no:document.getElementById('cl-no').value.trim(),contract_type:document.getElementById('cl-type').value,unit_price:Number(document.getElementById('cl-price').value)||0,parent_id:document.getElementById('cl-parent').value||null,sort_order:Number(document.getElementById('cl-order').value)||0,note:document.getElementById('cl-note').value.trim(),store_id:document.getElementById('cl-store-sel').value,active:true};
+  if(eid){await sbUpdate('cleaning_masters','id=eq.'+eid,rec);const m=db.cleaning_masters.find(x=>x.id===eid);if(m)Object.assign(m,rec);}
+  else{const nr={...rec,id:uid()};const res=await sbInsert('cleaning_masters',nr);if(res!==null)db.cleaning_masters.push(nr);}
+  closeModal('cleaning-master-modal');renderCleaningMasters();toast(eid?'更新しました':'追加しました');
+}
+async function deleteCleaningMaster(id){
+  if(!confirm('削除しますか？この得意先の月次データも全て削除されます。'))return;
+  await sbDelete('cleaning_masters','id=eq.'+id);
+  await sbDelete('cleaning_monthly','master_id=eq.'+id);
+  db.cleaning_masters=db.cleaning_masters.filter(m=>m.id!==id);
+  db.cleaning_monthly=db.cleaning_monthly.filter(r=>r.master_id!==id);
+  renderCleaningMasters();toast('削除しました');
+}
+// ===== 清掃台帳ここまで =====
 function renderSettings(){renderCatTags('service');renderCatTags('route');}
 function renderCatTags(k){const el=document.getElementById('cat-'+k+'-tags');el.innerHTML=(db.cats[k]||[]).map((c,i)=>`<span class="tag">${c}<button class="tag-del" onclick="removeCat('${k}',${i})">✕</button></span>`).join('');}
 async function addCat(k){const inp=document.getElementById('cat-'+k+'-input'),v=inp.value.trim();if(!v)return;if(db.cats[k].includes(v)){alert('すでに存在します');return;}db.cats[k].push(v);await sbUpsert('cats',{id:1,service:db.cats.service,route:db.cats.route});inp.value='';renderCatTags(k);toast('追加しました');}
@@ -1055,7 +1235,7 @@ function updStoreHidden(){
 
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 function closePrintModal(){document.getElementById('print-modal').classList.remove('open');}
-['print-modal','store-modal','user-modal'].forEach(id=>{document.getElementById(id).addEventListener('click',function(e){if(e.target===this){if(id==='print-modal')closePrintModal();else closeModal(id);}});});
+['print-modal','store-modal','user-modal','cleaning-master-modal'].forEach(id=>{document.getElementById(id).addEventListener('click',function(e){if(e.target===this){if(id==='print-modal')closePrintModal();else closeModal(id);}});});
 
 (async()=>{showLoading(true);const restored=await tryRestore();showLoading(false);if(restored)startApp();})();
 </script>
