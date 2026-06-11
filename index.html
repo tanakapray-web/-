@@ -243,6 +243,7 @@ tbody td{padding:10px 12px;color:var(--text);}
         <div class="card"><div class="card-header"><div class="card-title">月別売上推移</div></div><div class="chart-bars" id="chart-bars"></div></div>
       </div>
       <div class="card"><div class="card-header"><div class="card-title">最近の日報</div><div class="card-action" onclick="showPage('daily-list')">すべて見る →</div></div><table><thead><tr><th>日付</th><th>店舗</th><th>作成者</th><th>件数</th><th>売上計</th><th>天候</th></tr></thead><tbody id="dash-recent-daily"></tbody></table></div>
+      <div id="dash-division-section"></div>
     </div>
 
     <!-- DAILY REPORT -->
@@ -490,6 +491,7 @@ tbody td{padding:10px 12px;color:var(--text);}
     <!-- ADMIN: SETTINGS -->
     <div class="page" id="page-admin-settings">
       <div class="page-header"><h1>マスタ設定</h1><p>区分・経路の選択肢をカスタマイズできます</p></div>
+      <div class="card"><div class="card-header"><div class="card-title">事業部</div></div><div style="font-size:11px;color:var(--text2);margin-bottom:10px;">店舗に割り当てる事業部名を管理します。追加した事業部は店舗編集画面で選択できます。</div><div class="tag-list" id="cat-division-tags"></div><div class="tag-add-row"><input type="text" class="form-input" id="cat-division-input" placeholder="例: SM事業部" style="max-width:200px;" onkeydown="if(event.key==='Enter')addCat('division')"><button class="btn btn-primary btn-sm" onclick="addCat('division')">追加</button></div></div>
       <div class="card"><div class="card-header"><div class="card-title">サービス区分（デイリーの区分列）</div></div><div class="tag-list" id="cat-service-tags"></div><div class="tag-add-row"><input type="text" class="form-input" id="cat-service-input" placeholder="新しい区分名" style="max-width:200px;"><button class="btn btn-primary btn-sm" onclick="addCat('service')">追加</button></div></div>
       <div class="card"><div class="card-header"><div class="card-title">スポット獲得経路（共通デフォルト）</div></div><div style="font-size:11px;color:var(--text2);margin-bottom:10px;">各店舗で個別設定がない場合に使われます。店舗別はマネジャーが「経路設定」で変更できます。</div><div class="tag-list" id="cat-route-tags"></div><div class="tag-add-row"><input type="text" class="form-input" id="cat-route-input" placeholder="新しい経路名" style="max-width:200px;"><button class="btn btn-primary btn-sm" onclick="addCat('route')">追加</button></div></div>
     </div>
@@ -528,7 +530,7 @@ tbody td{padding:10px 12px;color:var(--text);}
 </div>
 <!-- STORE MODAL -->
 <div class="modal-overlay" id="store-modal">
-  <div class="modal modal-sm"><div class="modal-header"><div class="modal-title" id="store-modal-title">店舗追加</div><button class="modal-close" onclick="closeModal('store-modal')">✕</button></div><div class="form-group" style="margin-bottom:12px;"><label class="form-label">店舗名 *</label><input type="text" class="form-input" id="sm-name"></div><div class="form-group" style="margin-bottom:16px;"><label class="form-label">部署</label><input type="text" class="form-input" id="sm-dept"></div><input type="hidden" id="sm-edit-id"><div class="btn-row"><button class="btn btn-primary" onclick="saveStore()">保存</button><button class="btn btn-ghost" onclick="closeModal('store-modal')">キャンセル</button></div></div>
+  <div class="modal modal-sm"><div class="modal-header"><div class="modal-title" id="store-modal-title">店舗追加</div><button class="modal-close" onclick="closeModal('store-modal')">✕</button></div><div class="form-group" style="margin-bottom:12px;"><label class="form-label">部署名 *</label><input type="text" class="form-input" id="sm-deptname" placeholder="例: 月輪SM・HRP"></div><div class="form-group" style="margin-bottom:16px;"><label class="form-label">所属事業部</label><select class="form-input" id="sm-division"><option value="">未設定</option></select></div><input type="hidden" id="sm-edit-id"><div class="btn-row"><button class="btn btn-primary" onclick="saveStore()">保存</button><button class="btn btn-ghost" onclick="closeModal('store-modal')">キャンセル</button></div></div>
 </div>
 <!-- USER MODAL -->
 <div class="modal-overlay" id="user-modal">
@@ -564,7 +566,7 @@ async function sbUpsert(table,data){
 
 const DEF_CATS=['定期','スポット','新スポット','その他','商品'];
 const DEF_ROUTES=['DH','コールセンター','リピート','リコール','他部署紹介','他店紹介','お客様紹介','クレアス','ポスティング','DM','HP','その他','穴吹','湖光'];
-let db={stores:[],users:[],daily:[],monthly:[],cats:{service:[...DEF_CATS],route:[...DEF_ROUTES]},cleaning_masters:[],cleaning_monthly:[]};
+let db={stores:[],users:[],daily:[],monthly:[],cats:{service:[...DEF_CATS],route:[...DEF_ROUTES],division:[]},cleaning_masters:[],cleaning_monthly:[]};
 let currentUser=null,activeStoreFilter='all',activeInputStore='';
 let pendingSchedules=[]; // スケジュールから読み込んだデータ一時保存
 
@@ -582,7 +584,7 @@ async function loadDB(){
     db.users=(users||[]).map(u=>({...u,store_ids:u.store_ids||[u.store_id].filter(Boolean)}));
     db.daily=(daily||[]).map(d=>({...d,serviceRows:d.service_rows||[],stRows:d.st_rows||[],partRows:d.part_rows||[],storeId:d.store_id,createdAt:d.created_at}));
     db.monthly=(monthly||[]).map(m=>({...m,storeId:m.store_id,reportDate:m.report_date,zatsuRate:m.zatsu_rate,newContract:m.new_contract,newContractAmt:m.new_contract_amt,referralRcv:m.referral_rcv}));
-    if(cats&&cats[0]){db.cats={service:cats[0].service||DEF_CATS,route:cats[0].route||DEF_ROUTES};}
+    if(cats&&cats[0]){db.cats={service:cats[0].service||DEF_CATS,route:cats[0].route||DEF_ROUTES,division:cats[0].division||[]};}
     if(!db.stores.length){
       await sbInsert('stores',{id:'s1',name:'プレイ平店',dept:'サービスマスター事業部',created_at:today()});
       await sbInsert('users',{id:'a1',name:'管理者',login_id:'admin',pw:'admin123',store_id:'s1',dept:'管理部',position:'管理者',role:'admin',created_at:today()});
@@ -629,7 +631,7 @@ function startApp(){
   document.getElementById('filter-month').value=thisMonth();document.getElementById('filter-daily-month').value=thisMonth();document.getElementById('admin-filter-month').value=thisMonth();
   showPage('dashboard');
 }
-function buildSidebar(){const r=currentUser.role;let h='';h+=`<div class="nav-label">メイン</div>${ni('dashboard','📊','ダッシュボード')}`;h+=`<div class="nav-label">入力</div>${ni('daily','📝','デイリーレポート')}`;if(r!=='general'){h+=ni('monthly-report','📋','月間運営報告');h+=`<div class="nav-label">閲覧</div>${ni('sales-list','📈','売上予定一覧')}${ni('daily-list','🗂️','日報一覧')}${ni('monthly-list','📑','月間報告一覧')}`;h+=`<div class="nav-label">ツール</div>${ni('export','⬇️','エクスポート')}${ni('cleaning','🧹','清掃台帳')}${ni('store-routes','🛣️','経路設定')}${ni('budget','💰','予算設定')}`;}if(r==='admin')h+=`<div class="nav-label">管理者</div>${ni('admin-stores','🏢','店舗管理')}${ni('admin-users','👥','アカウント管理')}${ni('admin-sales','📊','全店舗 売上')}${ni('admin-settings','⚙️','マスタ設定')}`;document.getElementById('sidebar-nav').innerHTML=h;}
+function buildSidebar(){const r=currentUser.role;let h='';h+=`<div class="nav-label">メイン</div>${ni('dashboard','📊','ダッシュボード')}`;h+=`<div class="nav-label">入力</div>${ni('daily','📝','デイリーレポート')}`;if(r!=='general'){h+=ni('monthly-report','📋','月間運営報告');h+=ni('cleaning','🧽','売上報告(FM)');h+=`<div class="nav-label">閲覧</div>${ni('sales-list','📈','売上予定一覧')}${ni('daily-list','🗂️','日報一覧')}${ni('monthly-list','📑','月間報告一覧')}`;h+=`<div class="nav-label">ツール</div>${ni('export','⬇️','エクスポート')}${ni('store-routes','🛣️','経路設定')}${ni('budget','💰','予算設定')}`;}if(r==='admin')h+=`<div class="nav-label">管理者</div>${ni('admin-stores','🏢','店舗管理')}${ni('admin-users','👥','アカウント管理')}${ni('admin-settings','⚙️','マスタ設定')}`;document.getElementById('sidebar-nav').innerHTML=h;}
 function ni(id,icon,label){return`<div class="nav-item" id="nav-${id}" onclick="showPage('${id}')"><span class="nav-icon">${icon}</span>${label}</div>`;}
 function buildStoreFilter(){
   const r=currentUser.role;
@@ -704,7 +706,7 @@ function onViewFilterChange(){
   else if(id==='admin-sales')renderAdminSales();
   else if(id==='daily')initDailyForm();
 }
-const PT={'dashboard':'ダッシュボード','daily':'デイリーレポート入力','monthly-report':'月間運営報告','sales-list':'売上予定一覧','daily-list':'日報一覧','monthly-list':'月間報告一覧','export':'エクスポート','cleaning':'清掃台帳','store-routes':'スポット獲得経路の設定','budget':'予算設定','admin-stores':'店舗管理','admin-users':'アカウント管理','admin-sales':'全店舗 売上報告','admin-settings':'マスタ設定'};
+const PT={'dashboard':'ダッシュボード','daily':'デイリーレポート入力','monthly-report':'月間運営報告','cleaning':'売上報告(FM)','sales-list':'売上予定一覧','daily-list':'日報一覧','monthly-list':'月間報告一覧','export':'エクスポート','store-routes':'スポット獲得経路の設定','budget':'予算設定','admin-stores':'店舗管理','admin-users':'アカウント管理','admin-settings':'マスタ設定'};
 function showPage(id){
   const r=currentUser.role;
   if(['monthly-report','sales-list','daily-list','monthly-list','export','cleaning','store-routes','budget'].includes(id)&&r==='general')return;
@@ -712,7 +714,7 @@ function showPage(id){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const pg=document.getElementById('page-'+id);if(pg)pg.classList.add('active');const nv=document.getElementById('nav-'+id);if(nv)nv.classList.add('active');
   document.getElementById('topbar-title').textContent=PT[id]||id;
-  if(id==='dashboard')renderDashboard();else if(id==='daily')initDailyForm();else if(id==='monthly-report')initMonthlyForm();else if(id==='sales-list')renderSalesList().catch(console.error);else if(id==='daily-list')renderDailyList();else if(id==='monthly-list')renderMonthlyList();else if(id==='export')initExportPage();else if(id==='cleaning')initCleaningPage();else if(id==='store-routes')initStoreRoutes();else if(id==='budget')initBudgets();else if(id==='admin-stores')renderStores();else if(id==='admin-users')renderUsers();else if(id==='admin-sales')renderAdminSales();else if(id==='admin-settings')renderSettings();
+  if(id==='dashboard')renderDashboard();else if(id==='daily')initDailyForm();else if(id==='monthly-report')initMonthlyForm();else if(id==='sales-list')renderSalesList().catch(console.error);else if(id==='daily-list')renderDailyList();else if(id==='monthly-list')renderMonthlyList();else if(id==='export')initExportPage();else if(id==='cleaning')initCleaningPage();else if(id==='store-routes')initStoreRoutes();else if(id==='budget')initBudgets();else if(id==='admin-stores')renderStores();else if(id==='admin-users')renderUsers();else if(id==='admin-settings')renderSettings();
 }
 function visIds(){
   const r=currentUser.role;
@@ -749,6 +751,8 @@ function renderDashboard(){
   document.getElementById('chart-bars').innerHTML=months.map((mo,i)=>{const h=Math.round(mT[i]/mx*100),v=mT[i]>=10000?Math.round(mT[i]/10000)+'万':String(mT[i]);return`<div class="bar-wrap"><div class="bar-value">${v}</div><div class="bar" style="height:${h}px"></div><div class="bar-label">${mo.slice(5)}月</div></div>`;}).join('');
   const rec=[...fbStore(db.daily)].sort((a,b)=>b.date>a.date?1:-1).slice(0,5);const wi={'晴れ':'☀️','曇り':'☁️','雨':'🌧','雪':'❄️'};
   document.getElementById('dash-recent-daily').innerHTML=rec.length===0?'<tr><td colspan="6" style="color:var(--text2);text-align:center;padding:20px;">日報がありません</td></tr>':rec.map(d=>`<tr><td>${d.date}</td><td class="td-sub">${gs(d.storeId).name}</td><td>${d.author||'—'}</td><td class="td-mono">${(d.serviceRows||[]).filter(r=>r.name).length}件</td><td class="td-mono">${fy(dTotal(d))}</td><td>${(wi[d.weather]||'')+' '+(d.weather||'')}</td></tr>`).join('');
+  // 事業部集計セクション
+  renderDashDivision(m);
 }
 
 // ===== DAILY FORM =====
@@ -1024,9 +1028,9 @@ function viewMonthly(id){const m=db.monthly.find(r=>r.id===id);if(!m)return;docu
 async function delMonthly(id){if(!confirm('削除しますか？'))return;await sbDelete('monthly','id=eq.'+id);db.monthly=db.monthly.filter(m=>m.id!==id);renderMonthlyList();toast('削除しました');}
 
 // ADMIN STORES
-function renderStores(){document.getElementById('stores-tbody').innerHTML=db.stores.length===0?'<tr><td colspan="4" style="color:var(--text2);text-align:center;padding:20px;">店舗がありません</td></tr>':db.stores.map(s=>`<tr><td><strong>${s.name}</strong></td><td class="td-sub">${s.dept||'—'}</td><td class="td-sub">${s.created_at||s.createdAt||'—'}</td><td class="td-actions"><button class="btn btn-ghost btn-sm" onclick="openStoreModal('${s.id}')">編集</button><button class="btn btn-danger btn-sm" onclick="delStore('${s.id}')">削除</button></td></tr>`).join('');}
-function openStoreModal(id){const s=id?db.stores.find(x=>x.id===id):null;document.getElementById('store-modal-title').textContent=s?'店舗編集':'店舗追加';document.getElementById('sm-name').value=s?s.name:'';document.getElementById('sm-dept').value=s?s.dept||'':'';document.getElementById('sm-edit-id').value=id||'';document.getElementById('store-modal').classList.add('open');}
-async function saveStore(){const name=document.getElementById('sm-name').value.trim();if(!name){alert('店舗名を入力してください');return;}const eid=document.getElementById('sm-edit-id').value;if(eid){await sbUpdate('stores','id=eq.'+eid,{name,dept:document.getElementById('sm-dept').value.trim()});const s=db.stores.find(x=>x.id===eid);if(s){s.name=name;s.dept=document.getElementById('sm-dept').value.trim();}}else{const newStore={id:'s'+uid(),name,dept:document.getElementById('sm-dept').value.trim(),created_at:today()};await sbInsert('stores',newStore);db.stores.push(newStore);}closeModal('store-modal');renderStores();buildStoreFilter();toast(eid?'店舗を更新しました':'店舗を追加しました');}
+function renderStores(){document.getElementById('stores-tbody').innerHTML=db.stores.length===0?'<tr><td colspan="4" style="color:var(--text2);text-align:center;padding:20px;">部署がありません</td></tr>':db.stores.map(s=>`<tr><td><strong>${s.name}${s.dept?' '+s.dept:''}</strong></td><td class="td-sub"><span style="font-size:11px;padding:2px 7px;border-radius:4px;background:var(--bg3);color:var(--text2)">${s.division||'未設定'}</span></td><td class="td-sub">${s.created_at||s.createdAt||'—'}</td><td class="td-actions"><button class="btn btn-ghost btn-sm" onclick="openStoreModal('${s.id}')">編集</button><button class="btn btn-danger btn-sm" onclick="delStore('${s.id}')">削除</button></td></tr>`).join('');}
+function openStoreModal(id){const s=id?db.stores.find(x=>x.id===id):null;document.getElementById('store-modal-title').textContent=s?'部署編集':'部署追加';const fullName=s?(s.name+(s.dept?' '+s.dept:'')):'';document.getElementById('sm-deptname').value=fullName;document.getElementById('sm-division').innerHTML='<option value="">未設定</option>'+(db.cats.division||[]).map(d=>`<option value="${d}"${s&&s.division===d?' selected':''}>${d}</option>`).join('');document.getElementById('sm-edit-id').value=id||'';document.getElementById('store-modal').classList.add('open');}
+async function saveStore(){const name=document.getElementById('sm-deptname').value.trim();if(!name){alert('部署名を入力してください');return;}const eid=document.getElementById('sm-edit-id').value;const division=document.getElementById('sm-division').value;if(eid){await sbUpdate('stores','id=eq.'+eid,{name,dept:'',division});const s=db.stores.find(x=>x.id===eid);if(s){s.name=name;s.dept='';s.division=division;}}else{const newStore={id:'s'+uid(),name,dept:'',division,created_at:today()};await sbInsert('stores',newStore);db.stores.push(newStore);}closeModal('store-modal');renderStores();buildStoreFilter();toast(eid?'部署を更新しました':'部署を追加しました');}
 async function delStore(id){if(db.users.filter(u=>(u.store_id||u.storeId)===id).length>0){alert('この店舗のユーザーが存在します');return;}if(!confirm('削除しますか？'))return;await sbDelete('stores','id=eq.'+id);db.stores=db.stores.filter(s=>s.id!==id);renderStores();buildStoreFilter();toast('削除しました');}
 
 // ADMIN USERS
@@ -1202,10 +1206,53 @@ async function deleteCleaningMaster(id){
   renderCleaningMasters();toast('削除しました');
 }
 // ===== 清掃台帳ここまで =====
-function renderSettings(){renderCatTags('service');renderCatTags('route');}
+function renderDashDivision(month){
+  const el=document.getElementById('dash-division-section');if(!el)return;
+  const r=currentUser.role;
+  if(r==='general'){el.innerHTML='';return;}
+  const divs=db.cats.division||[];if(!divs.length){el.innerHTML='';return;}
+  const allDaily=db.daily.filter(d=>(d.date||'').startsWith(month));
+  const storeTotal=sid=>allDaily.filter(d=>(d.storeId||d.store_id)===sid).reduce((a,d)=>a+dTotal(d),0);
+  const divTotal=div=>db.stores.filter(s=>s.division===div).reduce((a,s)=>a+storeTotal(s.id),0);
+  let html='';
+  if(r==='manager'){
+    // 自分の所属事業部を表示
+    const myStoreIds=currentUser.store_ids||currentUser.storeIds||[currentUser.storeId].filter(Boolean);
+    const myDivs=[...new Set(db.stores.filter(s=>myStoreIds.includes(s.id)&&s.division).map(s=>s.division))];
+    if(!myDivs.length){el.innerHTML='';return;}
+    html=`<div class="card" style="margin-top:0;"><div class="card-header"><div class="card-title">事業部合計（${month}）</div></div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;">`;
+    myDivs.forEach(div=>{
+      const t=divTotal(div);
+      html+=`<div class="kpi-card"><div class="kpi-label">${div}</div><div class="kpi-value" style="font-size:18px;">${fy(t)}</div></div>`;
+    });
+    html+=`</div></div>`;
+  } else if(r==='admin'){
+    // 全体合計＋事業部別＋各部署個別
+    const grandTotal=db.stores.reduce((a,s)=>a+storeTotal(s.id),0);
+    html=`<div class="card" style="margin-top:0;"><div class="card-header"><div class="card-title">事業部別集計（${month}）</div></div>`;
+    // 全体
+    html+=`<div style="margin-bottom:14px;padding:12px 16px;background:var(--bg3);border-radius:8px;display:flex;justify-content:space-between;align-items:center;"><span style="font-weight:700;">全体合計</span><span style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700;">${fy(grandTotal)}</span></div>`;
+    // 事業部別
+    html+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:14px;">`;
+    divs.forEach(div=>{
+      const t=divTotal(div);
+      html+=`<div class="kpi-card"><div class="kpi-label">${div}</div><div class="kpi-value" style="font-size:18px;">${fy(t)}</div></div>`;
+    });
+    html+=`</div>`;
+    // 各部署個別
+    html+=`<div class="card-title" style="margin-bottom:8px;font-size:12px;">部署別内訳</div><table><thead><tr><th>部署</th><th>事業部</th><th class="td-mono">今月売上</th></tr></thead><tbody>`;
+    [...db.stores].sort((a,b)=>(a.division||'').localeCompare(b.division||'')).forEach(s=>{
+      const t=storeTotal(s.id);
+      html+=`<tr><td><strong>${s.name}</strong>${s.dept?` <span style="font-size:11px;color:var(--text2)">${s.dept}</span>`:''}</td><td><span style="font-size:11px;padding:2px 7px;border-radius:4px;background:var(--bg3);color:var(--text2)">${s.division||'未設定'}</span></td><td class="td-mono">${fy(t)}</td></tr>`;
+    });
+    html+=`</tbody></table></div>`;
+  }
+  el.innerHTML=html;
+}
+function renderSettings(){renderCatTags('division');renderCatTags('service');renderCatTags('route');}
 function renderCatTags(k){const el=document.getElementById('cat-'+k+'-tags');el.innerHTML=(db.cats[k]||[]).map((c,i)=>`<span class="tag">${c}<button class="tag-del" onclick="removeCat('${k}',${i})">✕</button></span>`).join('');}
-async function addCat(k){const inp=document.getElementById('cat-'+k+'-input'),v=inp.value.trim();if(!v)return;if(db.cats[k].includes(v)){alert('すでに存在します');return;}db.cats[k].push(v);await sbUpsert('cats',{id:1,service:db.cats.service,route:db.cats.route});inp.value='';renderCatTags(k);toast('追加しました');}
-async function removeCat(k,i){if(!confirm('削除しますか？'))return;db.cats[k].splice(i,1);await sbUpsert('cats',{id:1,service:db.cats.service,route:db.cats.route});renderCatTags(k);toast('削除しました');}
+async function addCat(k){const inp=document.getElementById('cat-'+k+'-input'),v=inp.value.trim();if(!v)return;if(db.cats[k].includes(v)){alert('すでに存在します');return;}db.cats[k].push(v);await sbUpsert('cats',{id:1,service:db.cats.service,route:db.cats.route,division:db.cats.division});inp.value='';renderCatTags(k);toast('追加しました');}
+async function removeCat(k,i){if(!confirm('削除しますか？'))return;db.cats[k].splice(i,1);await sbUpsert('cats',{id:1,service:db.cats.service,route:db.cats.route,division:db.cats.division});renderCatTags(k);toast('削除しました');}
 
 // EXPORT
 function initExportPage(){const months=[...new Set([...db.daily.map(d=>(d.date||'').slice(0,7)),...db.monthly.map(m=>m.month)].filter(Boolean))].sort().reverse();['export-sales-month','export-daily-month','print-monthly-select','print-sales-select'].forEach(id=>{const el=document.getElementById(id);if(!el)return;const f=el.options[0].outerHTML;el.innerHTML=f+months.map(m=>`<option value="${m}">${m}</option>`).join('');});}
