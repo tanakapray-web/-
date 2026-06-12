@@ -211,11 +211,11 @@ tbody td{padding:10px 12px;color:var(--text);}
     <div class="topbar-title" id="topbar-title">ダッシュボード</div>
     <div class="topbar-right">
       <div id="store-filter-wrap" style="display:none;align-items:center;gap:12px;">
-        <div style="display:flex;align-items:center;gap:6px;">
+        <div id="view-filter-wrap" style="display:flex;align-items:center;gap:6px;">
           <span style="font-size:11px;color:var(--text2);white-space:nowrap;">閲覧:</span>
           <select id="global-store-filter" onchange="onViewFilterChange()" style="background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:4px 10px;color:var(--text);font-size:12px;font-family:'Noto Sans JP',sans-serif;outline:none;cursor:pointer;"></select>
         </div>
-        <div style="display:flex;align-items:center;gap:6px;">
+        <div id="input-filter-wrap" style="display:flex;align-items:center;gap:6px;">
           <span style="font-size:11px;color:var(--text2);white-space:nowrap;">入力:</span>
           <select id="input-store-filter" onchange="onInputFilterChange()" style="background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:4px 10px;color:var(--text);font-size:12px;font-family:'Noto Sans JP',sans-serif;outline:none;cursor:pointer;"></select>
         </div>
@@ -630,28 +630,19 @@ function startApp(){
   document.getElementById('sb-store-name').textContent=(storeObj.name||'—')+((storeObj.dept&&storeObj.dept.trim())?' '+storeObj.dept.trim():'');document.getElementById('sb-name').textContent=currentUser.name;
   document.getElementById('sb-role').textContent=RL[currentUser.role]||currentUser.role;document.getElementById('sb-avatar').textContent=currentUser.name.slice(0,1);
   document.getElementById('topbar-date').textContent=new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'long',day:'numeric',weekday:'short'});
-  buildSidebar();buildStoreFilter();
+  buildSidebar('dashboard');buildStoreFilter();
   updateStoreDisplay();
   document.getElementById('filter-month').value=thisMonth();document.getElementById('filter-daily-month').value=thisMonth();document.getElementById('admin-filter-month').value=thisMonth();
   showPage('dashboard');
 }
 function buildSidebar(activePage){
   const r=currentUser.role;
-  const INPUT_PAGES=['daily','monthly-report','cleaning'];
-  const VIEW_PAGES=['sales-list','daily-list','monthly-list'];
-  const inInput=INPUT_PAGES.includes(activePage);
-  const inView=VIEW_PAGES.includes(activePage);
-  const inDash=activePage==='dashboard'||!activePage;
   let h=`<div class="nav-label">メイン</div>${ni('dashboard','📊','ダッシュボード')}`;
   if(r!=='general'){
-    if(!inView&&!inDash){
-      h+=`<div class="nav-label">入力</div>${ni('daily','📝','デイリーレポート')}`;
-      h+=ni('monthly-report','📋','月間運営報告');
-      h+=ni('cleaning','🧽','売上報告(FM)');
-    }
-    if(!inInput){
-      h+=`<div class="nav-label">閲覧</div>${ni('sales-list','📈','売上予定一覧')}${ni('daily-list','🗂️','日報一覧')}${ni('monthly-list','📑','月間報告一覧')}`;
-    }
+    h+=`<div class="nav-label">入力</div>${ni('daily','📝','デイリーレポート')}`;
+    h+=ni('monthly-report','📋','月間運営報告');
+    h+=ni('cleaning','🧽','売上報告(FM)');
+    h+=`<div class="nav-label">閲覧</div>${ni('sales-list','📈','売上予定一覧')}${ni('daily-list','🗂️','日報一覧')}${ni('monthly-list','📑','月間報告一覧')}`;
     h+=`<div class="nav-label">ツール</div>${ni('export','⬇️','エクスポート')}${ni('store-routes','🛣️','経路設定')}${ni('budget','💰','予算設定')}`;
   }
   if(r==='admin')h+=`<div class="nav-label">管理者</div>${ni('admin-stores','🏢','部署管理')}${ni('admin-users','👥','アカウント管理')}${ni('admin-settings','⚙️','マスタ設定')}`;
@@ -740,6 +731,14 @@ function showPage(id){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   const pg=document.getElementById('page-'+id);if(pg)pg.classList.add('active');
   document.getElementById('topbar-title').textContent=PT[id]||id;
+  const vfw=document.getElementById('view-filter-wrap');
+  const ifw=document.getElementById('input-filter-wrap');
+  if(vfw&&ifw){
+    const INPUT_PAGES=['daily','monthly-report','cleaning'];
+    const VIEW_PAGES=['sales-list','daily-list','monthly-list'];
+    vfw.style.display=INPUT_PAGES.includes(id)?'none':'flex';
+    ifw.style.display=VIEW_PAGES.includes(id)?'none':'flex';
+  }
   buildSidebar(id);
   if(id==='dashboard')renderDashboard();else if(id==='daily')initDailyForm();else if(id==='monthly-report')initMonthlyForm();else if(id==='sales-list')renderSalesList().catch(console.error);else if(id==='daily-list')renderDailyList();else if(id==='monthly-list')renderMonthlyList();else if(id==='export')initExportPage();else if(id==='cleaning')initCleaningPage();else if(id==='store-routes')initStoreRoutes();else if(id==='budget')initBudgets();else if(id==='admin-stores')renderStores();else if(id==='admin-users')renderUsers();else if(id==='admin-settings')renderSettings();
 }
