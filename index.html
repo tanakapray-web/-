@@ -232,6 +232,10 @@ tbody td{padding:10px 12px;color:var(--text);}
     <!-- DASHBOARD -->
     <div class="page active" id="page-dashboard">
       <div class="page-header"><h1>ダッシュボード</h1><p id="dash-subtitle">今月の概要</p></div>
+      <div style="display:flex;gap:8px;margin-bottom:16px;" id="dash-scope-row">
+        <button id="dash-scope-mine" class="btn btn-primary btn-sm" onclick="setDashScope('mine')">自店舗</button>
+        <button id="dash-scope-all" class="btn btn-ghost btn-sm" onclick="setDashScope('all')">全体</button>
+      </div>
       <div class="kpi-grid">
         <div class="kpi-card"><div class="kpi-label">今月売上</div><div class="kpi-value" id="kpi-sales">¥0</div><div class="kpi-sub" id="kpi-rate">—</div></div>
         <div class="kpi-card"><div class="kpi-label">件数</div><div class="kpi-value" id="kpi-count">0件</div><div class="kpi-sub" id="kpi-unit">客単価 ¥0</div></div>
@@ -473,7 +477,7 @@ tbody td{padding:10px 12px;color:var(--text);}
 
     <div class="page" id="page-admin-stores">
       <div class="page-header"><h1>店舗管理</h1></div>
-      <div class="card"><div class="card-header"><div class="card-title">店舗一覧</div><button class="btn btn-primary btn-sm" onclick="openStoreModal()">＋ 追加</button></div><table><thead><tr><th>店舗名</th><th>部署</th><th>登録日</th><th>操作</th></tr></thead><tbody id="stores-tbody"></tbody></table></div>
+      <div class="card"><div class="card-header"><div class="card-title">部署一覧</div><button class="btn btn-primary btn-sm" onclick="openStoreModal()">＋ 追加</button></div><table><thead><tr><th>部署名</th><th>事業部</th><th>登録日</th><th>操作</th></tr></thead><tbody id="stores-tbody"></tbody></table></div>
     </div>
 
     <!-- ADMIN: USERS -->
@@ -537,7 +541,7 @@ tbody td{padding:10px 12px;color:var(--text);}
   <div class="modal modal-sm"><div class="modal-header"><div class="modal-title" id="user-modal-title">ユーザー追加</div><button class="modal-close" onclick="closeModal('user-modal')">✕</button></div><div class="form-grid" style="margin-bottom:14px;"><div class="form-group"><label class="form-label">氏名 *</label><input type="text" class="form-input" id="um-name"></div><div class="form-group"><label class="form-label">ログインID *</label><input type="text" class="form-input" id="um-id"></div><div class="form-group"><label class="form-label">パスワード *</label><input type="password" class="form-input" id="um-pw" placeholder="編集時は空欄で変更なし"></div><div class="form-group"><label class="form-label">所属店舗 *（複数選択可）</label>
   <div id="um-store-checks" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;padding:10px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;max-height:160px;overflow-y:auto;"></div>
   <input type="hidden" id="um-store">
-</div><div class="form-group"><label class="form-label">部署</label><input type="text" class="form-input" id="um-dept"></div><div class="form-group"><label class="form-label">役職</label><input type="text" class="form-input" id="um-position"></div><div class="form-group"><label class="form-label">権限 *</label><select class="form-select" id="um-role"><option value="general">一般</option><option value="manager">マネジャー</option><option value="admin">管理者</option></select></div></div><input type="hidden" id="um-edit-id"><div class="btn-row"><button class="btn btn-primary" onclick="saveUser()">保存</button><button class="btn btn-ghost" onclick="closeModal('user-modal')">キャンセル</button></div></div>
+</div><div class="form-group"><label class="form-label">所属事業部（複数選択可）</label><div id="um-division-checks" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;padding:10px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;"></div></div><div class="form-group"><label class="form-label">役職</label><input type="text" class="form-input" id="um-position"></div><div class="form-group"><label class="form-label">権限 *</label><select class="form-select" id="um-role"><option value="general">一般</option><option value="manager">マネジャー</option><option value="admin">管理者</option></select></div></div><input type="hidden" id="um-edit-id"><div class="btn-row"><button class="btn btn-primary" onclick="saveUser()">保存</button><button class="btn btn-ghost" onclick="closeModal('user-modal')">キャンセル</button></div></div>
 </div>
 
 <div id="toast">✓ 保存しました</div>
@@ -631,7 +635,29 @@ function startApp(){
   document.getElementById('filter-month').value=thisMonth();document.getElementById('filter-daily-month').value=thisMonth();document.getElementById('admin-filter-month').value=thisMonth();
   showPage('dashboard');
 }
-function buildSidebar(){const r=currentUser.role;let h='';h+=`<div class="nav-label">メイン</div>${ni('dashboard','📊','ダッシュボード')}`;h+=`<div class="nav-label">入力</div>${ni('daily','📝','デイリーレポート')}`;if(r!=='general'){h+=ni('monthly-report','📋','月間運営報告');h+=ni('cleaning','🧽','売上報告(FM)');h+=`<div class="nav-label">閲覧</div>${ni('sales-list','📈','売上予定一覧')}${ni('daily-list','🗂️','日報一覧')}${ni('monthly-list','📑','月間報告一覧')}`;h+=`<div class="nav-label">ツール</div>${ni('export','⬇️','エクスポート')}${ni('store-routes','🛣️','経路設定')}${ni('budget','💰','予算設定')}`;}if(r==='admin')h+=`<div class="nav-label">管理者</div>${ni('admin-stores','🏢','店舗管理')}${ni('admin-users','👥','アカウント管理')}${ni('admin-settings','⚙️','マスタ設定')}`;document.getElementById('sidebar-nav').innerHTML=h;}
+function buildSidebar(activePage){
+  const r=currentUser.role;
+  const INPUT_PAGES=['daily','monthly-report','cleaning'];
+  const VIEW_PAGES=['sales-list','daily-list','monthly-list'];
+  const inInput=INPUT_PAGES.includes(activePage);
+  const inView=VIEW_PAGES.includes(activePage);
+  const inDash=activePage==='dashboard'||!activePage;
+  let h=`<div class="nav-label">メイン</div>${ni('dashboard','📊','ダッシュボード')}`;
+  if(r!=='general'){
+    if(!inView&&!inDash){
+      h+=`<div class="nav-label">入力</div>${ni('daily','📝','デイリーレポート')}`;
+      h+=ni('monthly-report','📋','月間運営報告');
+      h+=ni('cleaning','🧽','売上報告(FM)');
+    }
+    if(!inInput){
+      h+=`<div class="nav-label">閲覧</div>${ni('sales-list','📈','売上予定一覧')}${ni('daily-list','🗂️','日報一覧')}${ni('monthly-list','📑','月間報告一覧')}`;
+    }
+    h+=`<div class="nav-label">ツール</div>${ni('export','⬇️','エクスポート')}${ni('store-routes','🛣️','経路設定')}${ni('budget','💰','予算設定')}`;
+  }
+  if(r==='admin')h+=`<div class="nav-label">管理者</div>${ni('admin-stores','🏢','部署管理')}${ni('admin-users','👥','アカウント管理')}${ni('admin-settings','⚙️','マスタ設定')}`;
+  document.getElementById('sidebar-nav').innerHTML=h;
+  document.getElementById('nav-'+activePage)?.classList.add('active');
+}
 function ni(id,icon,label){return`<div class="nav-item" id="nav-${id}" onclick="showPage('${id}')"><span class="nav-icon">${icon}</span>${label}</div>`;}
 function buildStoreFilter(){
   const r=currentUser.role;
@@ -711,9 +737,10 @@ function showPage(id){
   const r=currentUser.role;
   if(['monthly-report','sales-list','daily-list','monthly-list','export','cleaning','store-routes','budget'].includes(id)&&r==='general')return;
   if(['admin-stores','admin-users','admin-sales','admin-settings'].includes(id)&&r!=='admin')return;
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-  const pg=document.getElementById('page-'+id);if(pg)pg.classList.add('active');const nv=document.getElementById('nav-'+id);if(nv)nv.classList.add('active');
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  const pg=document.getElementById('page-'+id);if(pg)pg.classList.add('active');
   document.getElementById('topbar-title').textContent=PT[id]||id;
+  buildSidebar(id);
   if(id==='dashboard')renderDashboard();else if(id==='daily')initDailyForm();else if(id==='monthly-report')initMonthlyForm();else if(id==='sales-list')renderSalesList().catch(console.error);else if(id==='daily-list')renderDailyList();else if(id==='monthly-list')renderMonthlyList();else if(id==='export')initExportPage();else if(id==='cleaning')initCleaningPage();else if(id==='store-routes')initStoreRoutes();else if(id==='budget')initBudgets();else if(id==='admin-stores')renderStores();else if(id==='admin-users')renderUsers();else if(id==='admin-settings')renderSettings();
 }
 function visIds(){
@@ -736,13 +763,26 @@ function partCnt(d){return(d.partRows||[]).filter(r=>r.name).length;}
 function dSalesByType(d){const m={};(d.serviceRows||[]).forEach(r=>{const t=r.type||'その他';m[t]=(m[t]||0)+(Number(r.amount)||0);if(Number(r.otherSales)>0)m['その他売上']=(m['その他売上']||0)+(Number(r.otherSales)||0);if(Number(r.goodsSales)>0)m['商品売上']=(m['商品売上']||0)+(Number(r.goodsSales)||0);});return m;}
 
 // ===== DASHBOARD =====
+let dashScope='mine';
+function setDashScope(s){
+  dashScope=s;
+  document.getElementById('dash-scope-mine').className='btn btn-sm '+(s==='mine'?'btn-primary':'btn-ghost');
+  document.getElementById('dash-scope-all').className='btn btn-sm '+(s==='all'?'btn-primary':'btn-ghost');
+  const row=document.getElementById('dash-scope-row');
+  if(row)row.style.display=(currentUser.role==='general'?'none':'');
+  renderDashboard();
+}
+function dashVisIds(){
+  if(dashScope==='all'&&currentUser.role!=='general')return db.stores.map(s=>s.id);
+  return visIds();
+}
 function renderDashboard(){
-  const m=thisMonth(),dailies=fbStore(db.daily).filter(d=>(d.date||'').startsWith(m));
+  const m=thisMonth(),_dids=dashVisIds(),dailies=db.daily.filter(d=>_dids.includes(d.storeId||d.store_id)&&(d.date||'').startsWith(m));
   let total=0,cnt=0;const byT={};
   dailies.forEach(d=>{Object.entries(dSalesByType(d)).forEach(([k,v])=>{byT[k]=(byT[k]||0)+v;total+=v;});cnt+=(d.serviceRows||[]).filter(r=>r.name).length;});
-  const cum=fbStore(db.daily).reduce((a,d)=>a+dTotal(d),0);
-  const mr=fbStore(db.monthly).find(x=>x.month===m);
-  const budget=budgetForMonth(m,visIds())||(mr?Number(mr.budget)||0:0),rate=budget>0?total/budget:0,up=cnt>0?Math.round(total/cnt):0;
+  const cum=db.daily.filter(d=>_dids.includes(d.storeId||d.store_id)).reduce((a,d)=>a+dTotal(d),0);
+  const mr=db.monthly.filter(d=>_dids.includes(d.storeId||d.store_id)).find(x=>x.month===m);
+  const budget=budgetForMonth(m,_dids)||(mr?Number(mr.budget)||0:0),rate=budget>0?total/budget:0,up=cnt>0?Math.round(total/cnt):0;
   document.getElementById('kpi-sales').textContent=fy(total);document.getElementById('kpi-count').textContent=cnt+'件';document.getElementById('kpi-unit').textContent='客単価 '+fy(up);document.getElementById('kpi-daily').textContent=dailies.length+'件';document.getElementById('kpi-total').textContent=fy(cum);document.getElementById('kpi-rate').textContent=budget>0?'予算比 '+(rate*100).toFixed(1)+'%':'予算未設定';
   const cats=db.cats.service||DEF_CATS;const col=Math.min(cats.length,4);const g=document.getElementById('dash-breakdown-grid');g.style.gridTemplateColumns=`repeat(${col},1fr)`;g.innerHTML=cats.map(c=>`<div class="summary-item"><div class="summary-key">${c}</div><div class="summary-val">${fy(byT[c]||0)}</div></div>`).join('');
   const pct=budget>0?Math.min(rate*100,100):0;document.getElementById('dash-progress').style.width=pct+'%';document.getElementById('dash-rate-text').textContent=budget>0?pct.toFixed(1)+'%':'—';
@@ -1035,25 +1075,25 @@ async function delStore(id){if(db.users.filter(u=>(u.store_id||u.storeId)===id).
 
 // ADMIN USERS
 function renderUsers(){document.getElementById('users-tbody').innerHTML=db.users.length===0?'<tr><td colspan="7" style="color:var(--text2);text-align:center;padding:20px;">ユーザーがありません</td></tr>':db.users.map(u=>`<tr><td class="td-mono">${u.login_id||u.loginId}</td><td><strong>${u.name}</strong></td><td class="td-sub">${(u.store_ids&&u.store_ids.length>1)?u.store_ids.map(id=>gs(id).name).join('・'):gs(u.store_id||u.storeId).name}</td><td class="td-sub">${u.dept||'—'}</td><td class="td-sub">${u.position||'—'}</td><td><span class="pill ${RB[u.role]||'pill-gray'}">${RL[u.role]||u.role}</span></td><td class="td-actions"><button class="btn btn-ghost btn-sm" onclick="openUserModal('${u.id}')">編集</button><button class="btn btn-danger btn-sm" onclick="delUser('${u.id}')">削除</button></td></tr>`).join('');}
-function openUserModal(id){const u=id?db.users.find(x=>x.id===id):null;document.getElementById('user-modal-title').textContent=u?'ユーザー編集':'ユーザー追加';document.getElementById('um-name').value=u?u.name:'';document.getElementById('um-id').value=u?u.login_id||u.loginId:'';document.getElementById('um-pw').value='';document.getElementById('um-dept').value=u?u.dept||'':'';document.getElementById('um-position').value=u?u.position||'':'';document.getElementById('um-role').value=u?u.role:'general';document.getElementById('um-edit-id').value=id||'';const storeIds=u?(u.store_ids||[u.store_id||u.storeId].filter(Boolean)):[];
+function openUserModal(id){const u=id?db.users.find(x=>x.id===id):null;document.getElementById('user-modal-title').textContent=u?'ユーザー編集':'ユーザー追加';document.getElementById('um-name').value=u?u.name:'';document.getElementById('um-id').value=u?u.login_id||u.loginId:'';document.getElementById('um-pw').value='';document.getElementById('um-position').value=u?u.position||'':'';document.getElementById('um-role').value=u?u.role:'general';document.getElementById('um-edit-id').value=id||'';const storeIds=u?(u.store_ids||[u.store_id||u.storeId].filter(Boolean)):[];
   document.getElementById('um-store').value=storeIds[0]||'';
-  document.getElementById('um-store-checks').innerHTML=db.stores.map(s=>`
-    <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;white-space:nowrap;">
-      <input type="checkbox" value="${s.id}" ${storeIds.includes(s.id)?'checked':''} onchange="updStoreHidden()">
-      ${s.name}${s.dept?' '+s.dept:''}
-    </label>`).join('');
+  document.getElementById('um-store-checks').innerHTML=db.stores.map(s=>`<label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;white-space:nowrap;"><input type="checkbox" value="${s.id}" ${storeIds.includes(s.id)?'checked':''} onchange="updStoreHidden()"> ${s.name}${s.dept?' '+s.dept:''}</label>`).join('');
+  const userDivs=u?(u.divisions||[]):[];
+  document.getElementById('um-division-checks').innerHTML=(db.cats.division||[]).length===0?'<span style="color:var(--text2);font-size:12px;">マスタ設定で事業部を追加してください</span>':(db.cats.division||[]).map(d=>`<label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;white-space:nowrap;"><input type="checkbox" name="um-div" value="${d}" ${userDivs.includes(d)?'checked':''}> ${d}</label>`).join('');
   document.getElementById('user-modal').classList.add('open');}
 async function saveUser(){const name=document.getElementById('um-name').value.trim(),lid=document.getElementById('um-id').value.trim(),pw=document.getElementById('um-pw').value;if(!name||!lid){alert('氏名とIDは必須です');return;}const eid=document.getElementById('um-edit-id').value;if(db.users.find(u=>(u.login_id||u.loginId)===lid&&u.id!==eid)){alert('このIDはすでに使われています');return;}const storeId=document.getElementById('um-store').value;
   const storeIds=[...document.querySelectorAll('#um-store-checks input:checked')].map(c=>c.value);
   if(!storeIds.length){alert('店舗を1つ以上選択してください');return;}
   if(eid){
-    const upd={name,login_id:lid,store_id:storeId||storeIds[0],store_ids:storeIds,dept:document.getElementById('um-dept').value.trim(),position:document.getElementById('um-position').value.trim(),role:document.getElementById('um-role').value};
+    const divisions=[...document.querySelectorAll('input[name="um-div"]:checked')].map(c=>c.value);
+    const upd={name,login_id:lid,store_id:storeId||storeIds[0],store_ids:storeIds,divisions,position:document.getElementById('um-position').value.trim(),role:document.getElementById('um-role').value};
     if(pw)upd.pw=pw;
     await sbUpdate('users','id=eq.'+eid,upd);
     const u=db.users.find(x=>x.id===eid);if(u){Object.assign(u,upd,{loginId:lid,storeId:storeId||storeIds[0],storeIds});}
   }else{
     if(!pw||pw.length<4){alert('パスワードは4文字以上で入力してください');return;}
-    const newUser={id:uid(),name,login_id:lid,pw,store_id:storeId||storeIds[0],store_ids:storeIds,dept:document.getElementById('um-dept').value.trim(),position:document.getElementById('um-position').value.trim(),role:document.getElementById('um-role').value,created_at:today()};
+    const divisions=[...document.querySelectorAll('input[name="um-div"]:checked')].map(c=>c.value);
+    const newUser={id:uid(),name,login_id:lid,pw,store_id:storeId||storeIds[0],store_ids:storeIds,divisions,position:document.getElementById('um-position').value.trim(),role:document.getElementById('um-role').value,created_at:today()};
     await sbInsert('users',newUser);db.users.push({...newUser,loginId:lid,storeId:storeId||storeIds[0],storeIds});
   }closeModal('user-modal');renderUsers();toast(eid?'ユーザーを更新しました':'ユーザーを追加しました');}
 async function delUser(id){if(id===currentUser.id){alert('自分自身は削除できません');return;}if(!confirm('削除しますか？'))return;await sbDelete('users','id=eq.'+id);db.users=db.users.filter(u=>u.id!==id);renderUsers();toast('削除しました');}
@@ -1217,8 +1257,7 @@ function renderDashDivision(month){
   let html='';
   if(r==='manager'){
     // 自分の所属事業部を表示
-    const myStoreIds=currentUser.store_ids||currentUser.storeIds||[currentUser.storeId].filter(Boolean);
-    const myDivs=[...new Set(db.stores.filter(s=>myStoreIds.includes(s.id)&&s.division).map(s=>s.division))];
+    const myDivs=currentUser.divisions&&currentUser.divisions.length?currentUser.divisions:[...new Set(db.stores.filter(s=>(currentUser.store_ids||[currentUser.storeId]).includes(s.id)&&s.division).map(s=>s.division))];
     if(!myDivs.length){el.innerHTML='';return;}
     html=`<div class="card" style="margin-top:0;"><div class="card-header"><div class="card-title">事業部合計（${month}）</div></div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;">`;
     myDivs.forEach(div=>{
