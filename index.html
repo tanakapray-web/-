@@ -951,8 +951,17 @@ async function loadScheduleSales(month){
 async function renderSalesList(){
   const month=document.getElementById('filter-month').value;
   const schedSales=await loadScheduleSales(month);
-  const schedRows=schedSales.filter(s=>s.date&&Number(s.amount)>0).map(s=>({date:s.date,type:s.category||'その他',name:s.name,amount:Number(s.amount)||0,other:0,goods:0,route:s.route||'',source:'schedule'}));
   let src=fbStore(db.daily);if(month)src=src.filter(d=>(d.date||'').startsWith(month));
+
+  // 日報が入力済みの日付+店舗の組み合わせを取得
+  const dailyDates=new Set(src.map(d=>`${d.date}__${d.storeId||d.store_id}`));
+
+  // 日報がある日はスケジュール予定を非表示（日報が実績として上書き）
+  const schedRows=schedSales
+    .filter(s=>!dailyDates.has(`${s.date}__${s.store_id}`))
+    .filter(s=>s.date&&Number(s.amount)>0)
+    .map(s=>({date:s.date,type:s.category||'その他',name:s.name,amount:Number(s.amount)||0,other:0,goods:0,route:s.route||'',source:'schedule'}));
+
   const dailyRows=[];src.forEach(d=>(d.serviceRows||[]).forEach(r=>{if(!r.name)return;const amt=Number(r.amount)||0,ot=Number(r.otherSales)||0,gd=Number(r.goodsSales)||0;if(amt<=0&&ot<=0&&gd<=0)return;dailyRows.push({date:d.date,type:r.type||'その他',name:r.name,amount:amt,other:ot,goods:gd,route:r.route||'',source:'daily'});}));
   const all=[...schedRows,...dailyRows];
   const COLS=['定期','スポット','新スポット'];
