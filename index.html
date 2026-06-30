@@ -232,10 +232,7 @@ tbody td{padding:10px 12px;color:var(--text);}
     <!-- DASHBOARD -->
     <div class="page active" id="page-dashboard">
       <div class="page-header"><h1>ダッシュボード</h1><p id="dash-subtitle">今月の概要</p></div>
-      <div style="display:flex;gap:8px;margin-bottom:16px;" id="dash-scope-row">
-        <button id="dash-scope-mine" class="btn btn-primary btn-sm" onclick="setDashScope('mine')">自店舗</button>
-        <button id="dash-scope-all" class="btn btn-ghost btn-sm" onclick="setDashScope('all')">全体</button>
-      </div>
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;" id="dash-scope-row"></div>
       <div class="kpi-grid">
         <div class="kpi-card"><div class="kpi-label">今月売上</div><div class="kpi-value" id="kpi-sales">¥0</div><div class="kpi-sub" id="kpi-rate">—</div></div>
         <div class="kpi-card"><div class="kpi-label">件数</div><div class="kpi-value" id="kpi-count">0件</div><div class="kpi-sub" id="kpi-unit">客単価 ¥0</div></div>
@@ -736,8 +733,13 @@ function showPage(id){
   if(vfw&&ifw){
     const INPUT_PAGES=['daily','monthly-report','cleaning'];
     const VIEW_PAGES=['sales-list','daily-list','monthly-list'];
-    vfw.style.display=INPUT_PAGES.includes(id)?'none':'flex';
-    ifw.style.display=VIEW_PAGES.includes(id)?'none':'flex';
+    if(id==='dashboard'){
+      vfw.style.display=(r==='admin')?'flex':'none';
+      ifw.style.display='none';
+    } else {
+      vfw.style.display=INPUT_PAGES.includes(id)?'none':'flex';
+      ifw.style.display=VIEW_PAGES.includes(id)?'none':'flex';
+    }
   }
   buildSidebar(id);
   if(id==='dashboard')renderDashboard();else if(id==='daily')initDailyForm();else if(id==='monthly-report')initMonthlyForm();else if(id==='sales-list')renderSalesList().catch(console.error);else if(id==='daily-list')renderDailyList();else if(id==='monthly-list')renderMonthlyList();else if(id==='export')initExportPage();else if(id==='cleaning')initCleaningPage();else if(id==='store-routes')initStoreRoutes();else if(id==='budget')initBudgets();else if(id==='admin-stores')renderStores();else if(id==='admin-users')renderUsers();else if(id==='admin-settings')renderSettings();
@@ -763,19 +765,43 @@ function dSalesByType(d){const m={};(d.serviceRows||[]).forEach(r=>{const t=r.ty
 
 // ===== DASHBOARD =====
 let dashScope='mine';
+function buildDashScopeButtons(){
+  const row=document.getElementById('dash-scope-row');
+  if(!row)return;
+  const r=currentUser.role;
+  const myDivs=currentUser.divisions&&currentUser.divisions.length?currentUser.divisions:[];
+  let buttons=[];
+  if(r==='general'){
+    buttons.push({key:'mine',label:'自店舗'});
+    if(myDivs.length===1)buttons.push({key:'div:'+myDivs[0],label:myDivs[0]});
+  } else if(r==='manager'){
+    buttons.push({key:'mine',label:'自店舗'});
+    (db.cats.division||[]).forEach(d=>buttons.push({key:'div:'+d,label:d}));
+    buttons.push({key:'all',label:'全体'});
+  } else if(r==='admin'){
+    buttons.push({key:'mine',label:'自店舗'});
+    (db.cats.division||[]).forEach(d=>buttons.push({key:'div:'+d,label:d}));
+    buttons.push({key:'all',label:'全体'});
+  }
+  if(buttons.length<=1){row.innerHTML='';row.style.display='none';return;}
+  row.style.display='flex';
+  row.innerHTML=buttons.map(b=>`<button id="dash-scope-${b.key.replace(':','-')}" class="btn btn-sm ${dashScope===b.key?'btn-primary':'btn-ghost'}" onclick="setDashScope('${b.key}')">${b.label}</button>`).join('');
+}
 function setDashScope(s){
   dashScope=s;
-  document.getElementById('dash-scope-mine').className='btn btn-sm '+(s==='mine'?'btn-primary':'btn-ghost');
-  document.getElementById('dash-scope-all').className='btn btn-sm '+(s==='all'?'btn-primary':'btn-ghost');
-  const row=document.getElementById('dash-scope-row');
-  if(row)row.style.display=(currentUser.role==='general'?'none':'');
+  buildDashScopeButtons();
   renderDashboard();
 }
 function dashVisIds(){
   if(dashScope==='all'&&currentUser.role!=='general')return db.stores.map(s=>s.id);
+  if(dashScope&&dashScope.startsWith('div:')){
+    const divName=dashScope.slice(4);
+    return db.stores.filter(s=>s.division===divName).map(s=>s.id);
+  }
   return visIds();
 }
 function renderDashboard(){
+  buildDashScopeButtons();
   const m=thisMonth(),_dids=dashVisIds(),dailies=db.daily.filter(d=>_dids.includes(d.storeId||d.store_id)&&(d.date||'').startsWith(m));
   let total=0,cnt=0;const byT={};
   dailies.forEach(d=>{Object.entries(dSalesByType(d)).forEach(([k,v])=>{byT[k]=(byT[k]||0)+v;total+=v;});cnt+=(d.serviceRows||[]).filter(r=>r.name).length;});
