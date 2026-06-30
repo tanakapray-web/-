@@ -250,6 +250,10 @@ tbody td{padding:10px 12px;color:var(--text);}
     <!-- DAILY REPORT -->
     <div class="page" id="page-daily">
       <div class="page-header"><h1>デイリーレポート入力</h1><p>サービス実績・売上・ST取引・パート管理を一括入力</p></div>
+      <div id="daily-edit-banner" style="display:none;align-items:center;gap:10px;background:rgba(176,125,0,.1);border:1px solid rgba(176,125,0,.3);border-radius:10px;padding:10px 16px;margin-bottom:16px;">
+        <span style="font-size:13px;color:var(--yellow);">✏️ 既存の日報を編集中です</span>
+        <button class="btn btn-ghost btn-sm" style="margin-left:auto;" onclick="cancelEditDaily()">編集をやめる</button>
+      </div>
       <div class="card">
         <div class="form-section">
           <div class="form-section-title">基本情報</div>
@@ -526,6 +530,23 @@ tbody td{padding:10px 12px;color:var(--text);}
   </div>
 </div>
 
+<div class="modal-overlay" id="sales-edit-modal">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">売上予定を編集</div><button class="modal-close" onclick="closeModal('sales-edit-modal')">✕</button></div>
+    <div style="padding:0 4px;">
+      <div class="form-group"><label class="form-label">日付</label><input type="date" class="form-input" id="se-date"></div>
+      <div class="form-group"><label class="form-label">顧客名</label><input type="text" class="form-input" id="se-name"></div>
+      <div style="display:flex;gap:12px;">
+        <div class="form-group" style="flex:1"><label class="form-label">区分</label><select class="form-input" id="se-category"></select></div>
+        <div class="form-group" style="flex:1"><label class="form-label">金額（税抜）</label><input type="number" class="form-input" id="se-amount"></div>
+      </div>
+      <div class="form-group"><label class="form-label">受注経路</label><select class="form-input" id="se-route"></select></div>
+      <input type="hidden" id="se-edit-id"><input type="hidden" id="se-kind"><input type="hidden" id="se-base-id"><input type="hidden" id="se-store-id">
+      <div class="modal-btns"><button class="btn" onclick="closeModal('sales-edit-modal')">キャンセル</button><button class="btn btn-primary" onclick="saveSalesEdit()">保存</button></div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="print-modal">
   <div class="modal"><div class="modal-header no-print"><div class="modal-title">印刷プレビュー</div><div style="display:flex;gap:8px;"><button class="btn btn-primary" onclick="window.print()">🖨️ 印刷 / PDF</button><button class="modal-close" onclick="closePrintModal()">✕ 閉じる</button></div></div><div class="print-area" id="print-content"></div></div>
 </div>
@@ -567,9 +588,10 @@ async function sbUpsert(table,data){
 
 const DEF_CATS=['定期','スポット','新スポット','その他','商品'];
 const DEF_ROUTES=['DH','コールセンター','リピート','リコール','他部署紹介','他店紹介','お客様紹介','クレアス','ポスティング','DM','HP','その他','穴吹','湖光'];
-let db={stores:[],users:[],daily:[],monthly:[],cats:{service:[...DEF_CATS],route:[...DEF_ROUTES],division:[]},cleaning_masters:[],cleaning_monthly:[]};
+let db={stores:[],users:[],daily:[],monthly:[],cats:{service:[...DEF_CATS],route:[...DEF_ROUTES],division:[]},cleaning_masters:[],cleaning_monthly:[],sales_overrides:[]};
 let currentUser=null,activeStoreFilter='all',activeInputStore='';
 let pendingSchedules=[]; // スケジュールから読み込んだデータ一時保存
+let editingDailyId=null; // 編集中の日報ID（nullなら新規作成）
 
 async function loadDB(){
   showLoading(true);
@@ -728,6 +750,7 @@ function showPage(id){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   const pg=document.getElementById('page-'+id);if(pg)pg.classList.add('active');
   document.getElementById('topbar-title').textContent=PT[id]||id;
+  if(id!=='daily'&&editingDailyId){editingDailyId=null;}
   const vfw=document.getElementById('view-filter-wrap');
   const ifw=document.getElementById('input-filter-wrap');
   if(vfw&&ifw){
@@ -826,7 +849,39 @@ function sOpts(sel){return db.cats.service.map(c=>`<option value="${c}"${c===sel
 function storeRoutes(sid){const s=db.stores.find(x=>x.id===sid);if(s&&Array.isArray(s.routes)&&s.routes.length)return s.routes;return db.cats.route||DEF_ROUTES;}
 function rtOpts(sel){const list=storeRoutes(activeInputStore);return'<option value="">—</option>'+list.map(r=>`<option value="${r}"${r===sel?' selected':''}>${r}</option>`).join('');}
 
+function editDailyReport(id){
+  const d=db.daily.find(r=>r.id===id);if(!d)return;
+  editingDailyId=id;
+  showPage('daily');
+  setTimeout(()=>{
+    document.getElementById('d-date').value=d.date||'';
+    document.getElementById('d-author').value=d.author||currentUser.name;
+    document.getElementById('d-weather').value=d.weather||'';
+    document.getElementById('d-visit').value=d.visit||0;
+    document.getElementById('d-estimate').value=d.estimate||0;
+    document.getElementById('d-contract').value=d.contract||0;
+    document.getElementById('d-tel').value=d.tel||0;
+    document.getElementById('d-posting').value=d.posting||0;
+    document.getElementById('d-ref').value=d.referral||0;
+    document.getElementById('d-notes').value=d.notes||'';
+    document.getElementById('service-tbody').innerHTML='';rC=0;
+    (d.serviceRows||[]).forEach(r=>{if(r.name)addServiceRowWithData(r);});
+    if(!document.getElementById('service-tbody').children.length){addServiceRow();addServiceRow();addServiceRow();}
+    document.getElementById('st-tbody').innerHTML='';stC=0;
+    (d.stRows||[]).forEach(r=>{if(r.name)addSTRowWithData(r);});
+    if(!document.getElementById('st-tbody').children.length)addSTRow();
+    document.getElementById('part-tbody').innerHTML='';pC=0;
+    (d.partRows||[]).forEach(r=>{if(r.name)addPartRowWithData(r);});
+    if(!document.getElementById('part-tbody').children.length)addPartRow();
+    updSales();updST();updPart();
+    document.getElementById('sched-import-bar').style.display='none';
+    const banner=document.getElementById('daily-edit-banner');
+    if(banner)banner.style.display='flex';
+  },100);
+}
+function cancelEditDaily(){editingDailyId=null;clearDaily();const banner=document.getElementById('daily-edit-banner');if(banner)banner.style.display='none';}
 function initDailyForm(){
+  if(!editingDailyId){const banner=document.getElementById('daily-edit-banner');if(banner)banner.style.display='none';}
   if(!document.getElementById('d-date').value)document.getElementById('d-date').value=today();
   document.getElementById('d-author').value=currentUser.name;
   document.getElementById('d-store').value=inputStoreName();
@@ -920,7 +975,9 @@ function addServiceRowWithData(data){
 
 function addServiceRow(){rC++;const tr=document.createElement('tr');tr.innerHTML=`<td style="text-align:center;color:var(--text2);font-size:11px;">${rC}</td><td><input type="text" placeholder="顧客名" oninput="updSales()"></td><td><input type="time"></td><td><input type="time"></td><td><input type="number" min="0" step="0.5" style="width:40px;" oninput="updSales()"></td><td><input type="number" min="0" style="width:32px;"></td><td><input type="number" min="0" style="width:32px;"></td><td><select oninput="updSales()">${sOpts()}</select></td><td><input type="text" placeholder="内容" style="min-width:80px;"></td><td><select><option>合</option><option>否</option></select></td><td><input type="number" min="0" oninput="updSales()"></td><td><input type="number" min="0"></td><td><input type="number" min="0"></td><td><input type="number" min="0" placeholder="0" oninput="updSales()"></td><td><input type="number" min="0" placeholder="0" oninput="updSales()"></td><td><select>${rtOpts()}</select></td><td><button class="del-btn" onclick="this.closest('tr').remove();reNumberRows();updSales()">✕</button></td>`;document.getElementById('service-tbody').appendChild(tr);}
 function addSTRow(){stC++;const tr=document.createElement('tr');tr.innerHTML=`<td style="text-align:center;color:var(--text2);font-size:11px;">${stC}</td><td><input type="text" placeholder="ST名・会社名"></td><td><input type="text" placeholder="作業内容"></td><td><input type="time"></td><td><input type="time"></td><td><input type="number" min="0" step="0.5" style="width:40px;"></td><td><input type="number" min="0" placeholder="0" oninput="updST()"></td><td><input type="number" min="0" placeholder="0" oninput="updST()"></td><td><input type="text" placeholder="備考"></td><td><button class="del-btn" onclick="this.closest('tr').remove();updST()">✕</button></td>`;document.getElementById('st-tbody').appendChild(tr);}
+function addSTRowWithData(d){stC++;const tr=document.createElement('tr');tr.innerHTML=`<td style="text-align:center;color:var(--text2);font-size:11px;">${stC}</td><td><input type="text" value="${d.name||''}" placeholder="ST名・会社名"></td><td><input type="text" value="${d.content||''}" placeholder="作業内容"></td><td><input type="time" value="${d.startTime||''}"></td><td><input type="time" value="${d.endTime||''}"></td><td><input type="number" min="0" step="0.5" style="width:40px;" value="${d.hours||''}"></td><td><input type="number" min="0" placeholder="0" value="${d.payExTax||''}" oninput="updST()"></td><td><input type="number" min="0" placeholder="0" value="${d.payInTax||''}" oninput="updST()"></td><td><input type="text" value="${d.note||''}" placeholder="備考"></td><td><button class="del-btn" onclick="this.closest('tr').remove();updST()">✕</button></td>`;document.getElementById('st-tbody').appendChild(tr);}
 function addPartRow(){pC++;const tr=document.createElement('tr');tr.innerHTML=`<td style="text-align:center;color:var(--text2);font-size:11px;">${pC}</td><td><input type="text" placeholder="氏名" oninput="updPart()"></td><td><input type="text" placeholder="顧客先（現場）"></td><td><input type="time"></td><td><input type="time"></td><td><input type="number" min="0" step="0.5" style="width:40px;"></td><td><input type="number" min="0" placeholder="0" oninput="updPart()"></td><td><input type="number" min="0" placeholder="0" oninput="updPart()"></td><td class="part-tot-cell" style="text-align:center;font-family:'DM Mono',monospace;">¥0</td><td><input type="text" placeholder="備考"></td><td><button class="del-btn" onclick="this.closest('tr').remove();updPart()">✕</button></td>`;document.getElementById('part-tbody').appendChild(tr);}
+function addPartRowWithData(d){pC++;const tr=document.createElement('tr');tr.innerHTML=`<td style="text-align:center;color:var(--text2);font-size:11px;">${pC}</td><td><input type="text" value="${d.name||''}" placeholder="氏名" oninput="updPart()"></td><td><input type="text" value="${d.place||''}" placeholder="顧客先（現場）"></td><td><input type="time" value="${d.startTime||''}"></td><td><input type="time" value="${d.endTime||''}"></td><td><input type="number" min="0" step="0.5" style="width:40px;" value="${d.hours||''}"></td><td><input type="number" min="0" placeholder="0" value="${d.daily||''}" oninput="updPart()"></td><td><input type="number" min="0" placeholder="0" value="${d.transport||''}" oninput="updPart()"></td><td class="part-tot-cell" style="text-align:center;font-family:'DM Mono',monospace;">¥0</td><td><input type="text" value="${d.note||''}" placeholder="備考"></td><td><button class="del-btn" onclick="this.closest('tr').remove();updPart()">✕</button></td>`;document.getElementById('part-tbody').appendChild(tr);}
 function reNumberRows(){
   document.getElementById('service-tbody').querySelectorAll('tr').forEach((tr,i)=>{
     const firstTd=tr.querySelector('td');if(firstTd)firstTd.textContent=i+1;
@@ -935,12 +992,25 @@ async function saveDaily(){
   const sR=[];document.getElementById('service-tbody').querySelectorAll('tr').forEach((tr,i)=>{const inp=tr.querySelectorAll('input,select');const name=inp[0]?inp[0].value.trim():'';if(!name)return;sR.push({no:i+1,name,startTime:inp[1]?inp[1].value:'',endTime:inp[2]?inp[2].value:'',hours:inp[3]?inp[3].value:'',staff:inp[4]?inp[4].value:'',pa:inp[5]?inp[5].value:'',type:inp[6]?inp[6].value:'',content:inp[7]?inp[7].value:'',result:inp[8]?inp[8].value:'',amount:Number(inp[9]?inp[9].value:0)||0,payment:Number(inp[10]?inp[10].value:0)||0,receivable:Number(inp[11]?inp[11].value:0)||0,otherSales:Number(inp[12]?inp[12].value:0)||0,goodsSales:Number(inp[13]?inp[13].value:0)||0,route:inp[14]?inp[14].value:''});});
   const stR=[];document.getElementById('st-tbody').querySelectorAll('tr').forEach((tr,i)=>{const inp=tr.querySelectorAll('input');const name=inp[0]?inp[0].value.trim():'';if(!name)return;stR.push({no:i+1,name,content:inp[1]?inp[1].value:'',startTime:inp[2]?inp[2].value:'',endTime:inp[3]?inp[3].value:'',hours:inp[4]?inp[4].value:'',payExTax:Number(inp[5]?inp[5].value:0)||0,payInTax:Number(inp[6]?inp[6].value:0)||0,note:inp[7]?inp[7].value:''});});
   const pR=[];document.getElementById('part-tbody').querySelectorAll('tr').forEach((tr,i)=>{const inp=tr.querySelectorAll('input');const name=inp[0]?inp[0].value.trim():'';if(!name)return;pR.push({no:i+1,name,place:inp[1]?inp[1].value:'',startTime:inp[2]?inp[2].value:'',endTime:inp[3]?inp[3].value:'',hours:inp[4]?inp[4].value:'',daily:Number(inp[5]?inp[5].value:0)||0,transport:Number(inp[6]?inp[6].value:0)||0,note:inp[7]?inp[7].value:''});});
+  if(editingDailyId){
+    const rec={date,store_id:inputStoreId(),author:currentUser.name,weather:document.getElementById('d-weather').value,service_rows:sR,st_rows:stR,part_rows:pR,visit:document.getElementById('d-visit').value,estimate:document.getElementById('d-estimate').value,contract:document.getElementById('d-contract').value,tel:document.getElementById('d-tel').value,posting:document.getElementById('d-posting').value,referral:document.getElementById('d-ref').value,notes:document.getElementById('d-notes').value};
+    const result=await sbUpdate('daily','id=eq.'+editingDailyId,rec);
+    if(result){
+      const idx=db.daily.findIndex(d=>d.id===editingDailyId);
+      if(idx>=0)db.daily[idx]={...db.daily[idx],...rec,storeId:rec.store_id,serviceRows:sR,stRows:stR,partRows:pR};
+      toast('デイリーレポートを更新しました');
+      editingDailyId=null;
+      const banner=document.getElementById('daily-edit-banner');if(banner)banner.style.display='none';
+      showPage('daily-list');
+    } else alert('更新に失敗しました。通信状態を確認してください。');
+    return;
+  }
   const rec={id:uid(),date,store_id:inputStoreId(),author:currentUser.name,weather:document.getElementById('d-weather').value,service_rows:sR,st_rows:stR,part_rows:pR,visit:document.getElementById('d-visit').value,estimate:document.getElementById('d-estimate').value,contract:document.getElementById('d-contract').value,tel:document.getElementById('d-tel').value,posting:document.getElementById('d-posting').value,referral:document.getElementById('d-ref').value,notes:document.getElementById('d-notes').value,created_at:today()};
   const result=await sbInsert('daily',rec);
   if(result){db.daily.unshift({...rec,storeId:rec.store_id,serviceRows:sR,stRows:stR,partRows:pR,createdAt:rec.created_at});toast('デイリーレポートを保存しました');}
   else alert('保存に失敗しました。通信状態を確認してください。');
 }
-function clearDaily(){document.getElementById('service-tbody').innerHTML='';document.getElementById('st-tbody').innerHTML='';document.getElementById('part-tbody').innerHTML='';rC=0;stC=0;pC=0;['d-visit','d-estimate','d-contract','d-tel','d-posting','d-ref'].forEach(id=>document.getElementById(id).value='0');document.getElementById('d-notes').value='';document.getElementById('sched-import-bar').style.display='none';pendingSchedules=[];initDailyForm();}
+function clearDaily(){document.getElementById('service-tbody').innerHTML='';document.getElementById('st-tbody').innerHTML='';document.getElementById('part-tbody').innerHTML='';rC=0;stC=0;pC=0;['d-visit','d-estimate','d-contract','d-tel','d-posting','d-ref'].forEach(id=>document.getElementById(id).value='0');document.getElementById('d-notes').value='';document.getElementById('sched-import-bar').style.display='none';pendingSchedules=[];document.getElementById('d-date').value='';initDailyForm();}
 
 // MONTHLY
 function initMonthlyForm(){if(!document.getElementById('mr-month').value)document.getElementById('mr-month').value=thisMonth();if(!document.getElementById('mr-report-date').value)document.getElementById('mr-report-date').value=today();document.getElementById('mr-manager').value=currentUser.name;document.getElementById('mr-store').value=inputStoreName();autoFillMonthly();}
@@ -979,6 +1049,12 @@ async function renderSalesList(){
   const schedSales=await loadScheduleSales(month);
   let src=fbStore(db.daily);if(month)src=src.filter(d=>(d.date||'').startsWith(month));
 
+  // 上書き編集データを取得
+  let ovQuery=`select=*`;if(month)ovQuery+=`&date=gte.${month}-01&date=lte.${month}-31`;
+  const overrides=await sbGet('sales_overrides',ovQuery)||[];
+  db.sales_overrides=overrides;
+  const ovMap={};overrides.forEach(o=>{ovMap[o.id]=o;});
+
   // 日報が入力済みの日付+店舗の組み合わせを取得
   const dailyDates=new Set(src.map(d=>`${d.date}__${d.storeId||d.store_id}`));
 
@@ -986,10 +1062,24 @@ async function renderSalesList(){
   const schedRows=schedSales
     .filter(s=>!dailyDates.has(`${s.date}__${s.store_id}`))
     .filter(s=>s.date&&Number(s.amount)>0)
-    .map(s=>({date:s.date,type:s.category||'その他',name:s.name,amount:Number(s.amount)||0,other:0,goods:0,route:s.route||'',source:'schedule'}));
+    .map(s=>{
+      const ovId='sched_'+s.id;
+      const ov=ovMap[ovId];
+      if(ov)return{date:ov.date,type:ov.category||'その他',name:ov.name,amount:Number(ov.amount)||0,other:0,goods:0,route:ov.route||'',source:'schedule',editId:ovId,_baseId:s.id,_kind:'schedule',store_id:s.store_id};
+      return{date:s.date,type:s.category||'その他',name:s.name,amount:Number(s.amount)||0,other:0,goods:0,route:s.route||'',source:'schedule',editId:ovId,_baseId:s.id,_kind:'schedule',store_id:s.store_id};
+    });
 
-  const dailyRows=[];src.forEach(d=>(d.serviceRows||[]).forEach(r=>{if(!r.name)return;const amt=Number(r.amount)||0,ot=Number(r.otherSales)||0,gd=Number(r.goodsSales)||0;if(amt<=0&&ot<=0&&gd<=0)return;dailyRows.push({date:d.date,type:r.type||'その他',name:r.name,amount:amt,other:ot,goods:gd,route:r.route||'',source:'daily'});}));
+  const dailyRows=[];src.forEach(d=>(d.serviceRows||[]).forEach((r,ri)=>{
+    if(!r.name)return;
+    const baseId=`daily_${d.id}_${ri}`;
+    const ov=ovMap[baseId];
+    const sid=d.storeId||d.store_id;
+    if(ov){const amt=Number(ov.amount)||0;if(amt<=0)return;dailyRows.push({date:ov.date,type:ov.category||'その他',name:ov.name,amount:amt,other:0,goods:0,route:ov.route||'',source:'daily',editId:baseId,_kind:'daily',store_id:sid});return;}
+    const amt=Number(r.amount)||0,ot=Number(r.otherSales)||0,gd=Number(r.goodsSales)||0;if(amt<=0&&ot<=0&&gd<=0)return;
+    dailyRows.push({date:d.date,type:r.type||'その他',name:r.name,amount:amt,other:ot,goods:gd,route:r.route||'',source:'daily',editId:baseId,_kind:'daily',store_id:sid});
+  }));
   const all=[...schedRows,...dailyRows];
+  window._salesListAll=all;
   const COLS=['定期','スポット','新スポット'];
   const colBg={'定期':'#d9f2f7','スポット':'#fbf3c5','新スポット':'#fbe0c4'};
   const fmt=n=>n?fy(n):'';
@@ -1006,7 +1096,7 @@ async function renderSalesList(){
     const dayItems=all.filter(r=>r.date===dk);
     const dayTot=dayItems.reduce((a,r)=>a+r.amount+r.other+r.goods,0);
     const md=dk.split('-');const label=`${Number(md[1])}/${Number(md[2])}`;
-    const cell=cat=>{const items=dayItems.filter(r=>r.type===cat);const bg=colBg[cat]+'22';if(!items.length)return `<td style="background:${bg}"></td><td style="background:${bg}"></td>`;return `<td style="background:${bg}">${items.map(r=>`<div>${r.name}${r.source==='schedule'?' <span class="xpre">予定</span>':''}</div>`).join('')}</td><td class="td-mono" style="background:${bg}">${items.map(r=>`<div>${fmt(r.amount)}</div>`).join('')}</td>`;};
+    const cell=cat=>{const items=dayItems.filter(r=>r.type===cat);const bg=colBg[cat]+'22';if(!items.length)return `<td style="background:${bg}"></td><td style="background:${bg}"></td>`;return `<td style="background:${bg}">${items.map(r=>`<div style="cursor:pointer;" onclick="openSalesEdit('${r.editId}','${r._kind}','${r._baseId||''}')">${r.name}${r.source==='schedule'?' <span class="xpre">予定</span>':''}</div>`).join('')}</td><td class="td-mono" style="background:${bg}">${items.map(r=>`<div style="cursor:pointer;" onclick="openSalesEdit('${r.editId}','${r._kind}','${r._baseId||''}')">${fmt(r.amount)}</div>`).join('')}</td>`;};
     g+=`<tr><td class="xd">${label}</td>${COLS.map(cell).join('')}<td class="td-mono xtot">${fmt(dayTot)}</td></tr>`;
   });
   g+=`<tr class="xsum"><td>合計</td>${COLS.map(c=>`<td class="td-mono">${catCnt[c]}件</td><td class="td-mono">${fmt(catTot[c])}</td>`).join('')}<td class="td-mono">${fmt(grand3+otherTot+goodsTot)}</td></tr></tbody></table></div>`;
@@ -1029,7 +1119,7 @@ async function renderSalesList(){
 }
 
 // DAILY LIST
-function renderDailyList(){const month=document.getElementById('filter-daily-month').value;let data=fbStore(db.daily);if(month)data=data.filter(d=>(d.date||'').startsWith(month));data=[...data].sort((a,b)=>b.date>a.date?1:-1);document.getElementById('daily-count-badge').textContent=data.length+'件';const wi={'晴れ':'☀️','曇り':'☁️','雨':'🌧','雪':'❄️'};document.getElementById('daily-list-tbody').innerHTML=data.length===0?'<tr><td colspan="11" style="color:var(--text2);text-align:center;padding:20px;">日報がありません</td></tr>':data.map(d=>`<tr><td>${d.date}</td><td class="td-sub">${gs(d.storeId).name}</td><td>${d.author||'—'}</td><td>${(wi[d.weather]||'')+' '+(d.weather||'')}</td><td class="td-mono">${(d.serviceRows||[]).filter(r=>r.name).length}件</td><td class="td-mono">${fy(dTotal(d))}</td><td class="td-mono td-sub">${fy(stTotal(d))}</td><td class="td-mono td-sub">${fy(partCost(d))}</td><td class="td-mono">${d.visit||0}</td><td class="td-mono">${d.estimate||0}</td><td class="td-actions"><button class="btn btn-ghost btn-sm" onclick="viewDaily('${d.id}')">詳細</button><button class="btn btn-danger btn-sm" onclick="delDaily('${d.id}')">削除</button></td></tr>`).join('');
+function renderDailyList(){const month=document.getElementById('filter-daily-month').value;let data=fbStore(db.daily);if(month)data=data.filter(d=>(d.date||'').startsWith(month));data=[...data].sort((a,b)=>b.date>a.date?1:-1);document.getElementById('daily-count-badge').textContent=data.length+'件';const wi={'晴れ':'☀️','曇り':'☁️','雨':'🌧','雪':'❄️'};document.getElementById('daily-list-tbody').innerHTML=data.length===0?'<tr><td colspan="11" style="color:var(--text2);text-align:center;padding:20px;">日報がありません</td></tr>':data.map(d=>`<tr><td>${d.date}</td><td class="td-sub">${gs(d.storeId).name}</td><td>${d.author||'—'}</td><td>${(wi[d.weather]||'')+' '+(d.weather||'')}</td><td class="td-mono">${(d.serviceRows||[]).filter(r=>r.name).length}件</td><td class="td-mono">${fy(dTotal(d))}</td><td class="td-mono td-sub">${fy(stTotal(d))}</td><td class="td-mono td-sub">${fy(partCost(d))}</td><td class="td-mono">${d.visit||0}</td><td class="td-mono">${d.estimate||0}</td><td class="td-actions"><button class="btn btn-ghost btn-sm" onclick="viewDaily('${d.id}')">詳細</button><button class="btn btn-ghost btn-sm" onclick="editDailyReport('${d.id}')">編集</button><button class="btn btn-danger btn-sm" onclick="delDaily('${d.id}')">削除</button></td></tr>`).join('');
   {const bm=document.getElementById('filter-daily-month').value||thisMonth();const td=today();const tot=fbStore(db.daily).filter(d=>(d.date||'').startsWith(bm)&&(d.date||'')<=td).reduce((a,d)=>a+dTotal(d),0);const bud=budgetForMonth(bm,visIds());const el=document.getElementById('daily-budget-banner');if(el)el.innerHTML=budgetSummaryHTML(bm,tot,bud,'当日までの合計');}
 }
 async function delDaily(id){if(!confirm('削除しますか？'))return;await sbDelete('daily','id=eq.'+id);db.daily=db.daily.filter(d=>d.id!==id);renderDailyList();toast('削除しました');}
@@ -1322,6 +1412,31 @@ function renderDashDivision(month){
   }
   el.innerHTML=html;
 }
+// ===== 売上予定一覧の編集 =====
+function openSalesEdit(editId,kind,baseId){
+  const row=(window._salesListAll||[]).find(r=>r.editId===editId);
+  if(!row)return;
+  document.getElementById('se-date').value=row.date||'';
+  document.getElementById('se-name').value=row.name||'';
+  document.getElementById('se-amount').value=row.amount||'';
+  document.getElementById('se-category').innerHTML=(db.cats.service||DEF_CATS).map(c=>`<option value="${c}"${c===row.type?' selected':''}>${c}</option>`).join('');
+  document.getElementById('se-route').innerHTML='<option value="">未選択</option>'+(db.cats.route||DEF_ROUTES).map(r=>`<option value="${r}"${r===row.route?' selected':''}>${r}</option>`).join('');
+  document.getElementById('se-edit-id').value=editId;
+  document.getElementById('se-kind').value=kind;
+  document.getElementById('se-base-id').value=baseId||'';
+  document.getElementById('se-store-id').value=row.store_id||'';
+  document.getElementById('sales-edit-modal').classList.add('open');
+}
+async function saveSalesEdit(){
+  const editId=document.getElementById('se-edit-id').value;
+  const kind=document.getElementById('se-kind').value;
+  const storeId=document.getElementById('se-store-id').value;
+  const rec={id:editId,date:document.getElementById('se-date').value,store_id:storeId,category:document.getElementById('se-category').value,name:document.getElementById('se-name').value.trim(),amount:Number(document.getElementById('se-amount').value)||0,route:document.getElementById('se-route').value,note:kind};
+  if(!rec.name){alert('顧客名を入力してください');return;}
+  const result=await sbUpsert('sales_overrides',rec);
+  if(result){closeModal('sales-edit-modal');toast('更新しました');renderSalesList();}
+  else alert('保存に失敗しました');
+}
 function renderSettings(){renderCatTags('division');renderCatTags('service');renderCatTags('route');}
 function renderCatTags(k){const el=document.getElementById('cat-'+k+'-tags');el.innerHTML=(db.cats[k]||[]).map((c,i)=>`<span class="tag">${c}<button class="tag-del" onclick="removeCat('${k}',${i})">✕</button></span>`).join('');}
 async function addCat(k){const inp=document.getElementById('cat-'+k+'-input'),v=inp.value.trim();if(!v)return;if(db.cats[k].includes(v)){alert('すでに存在します');return;}db.cats[k].push(v);await sbUpsert('cats',{id:1,service:db.cats.service,route:db.cats.route,division:db.cats.division});inp.value='';renderCatTags(k);toast('追加しました');}
@@ -1355,7 +1470,7 @@ function updStoreHidden(){
 
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 function closePrintModal(){document.getElementById('print-modal').classList.remove('open');}
-['print-modal','store-modal','user-modal','cleaning-master-modal'].forEach(id=>{document.getElementById(id).addEventListener('click',function(e){if(e.target===this){if(id==='print-modal')closePrintModal();else closeModal(id);}});});
+['print-modal','store-modal','user-modal','cleaning-master-modal','sales-edit-modal'].forEach(id=>{document.getElementById(id).addEventListener('click',function(e){if(e.target===this){if(id==='print-modal')closePrintModal();else closeModal(id);}});});
 
 (async()=>{showLoading(true);const restored=await tryRestore();showLoading(false);if(restored)startApp();})();
 </script>
