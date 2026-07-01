@@ -391,7 +391,7 @@ tbody td{padding:10px 12px;color:var(--text);}
       <div class="page-header"><h1>売上予定合計</h1></div>
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
         <input type="month" class="form-input" id="ss-month" style="width:auto;" onchange="renderSalesSummary()">
-        <div style="display:flex;gap:6px;flex-wrap:wrap;" id="ss-scope-row"></div>
+        
       </div>
       <div style="overflow-x:auto;" id="ss-table-wrap"><div style="color:var(--text2);text-align:center;padding:40px;">読み込み中...</div></div>
     </div>
@@ -1311,7 +1311,7 @@ function clVisIds(){
 }
 function getCleaningTotal(storeId,month){if(!db.cleaning_masters||!db.cleaning_monthly)return 0;const masters=db.cleaning_masters.filter(m=>m.store_id===storeId&&m.active!==false);const recs={};db.cleaning_monthly.filter(r=>r.month===month&&r.store_id===storeId).forEach(r=>recs[r.master_id]=r);return masters.reduce((sum,m)=>{const r=recs[m.id];const t=m.contract_type||'定額';const count=r?Number(r.count)||0:(t==='定額'?1:0);return sum+(r&&r.amount_override!=null?Number(r.amount_override):Math.round(Number(m.unit_price||0)*count));},0);}
 async function initCleaningPage(){
-  try{const[ms,mo]=await Promise.all([sbFetch('cleaning_masters','order=sort_order.asc'),sbFetch('cleaning_monthly','')]);db.cleaning_masters=ms||[];db.cleaning_monthly=mo||[];}catch(e){db.cleaning_masters=db.cleaning_masters||[];db.cleaning_monthly=db.cleaning_monthly||[];}
+  try{const[ms,mo]=await Promise.all([sbGet('cleaning_masters','order=sort_order'),sbGet('cleaning_monthly','')]);db.cleaning_masters=ms||[];db.cleaning_monthly=mo||[];}catch(e){db.cleaning_masters=db.cleaning_masters||[];db.cleaning_monthly=db.cleaning_monthly||[];}
   if(!document.getElementById('cl-month').value)document.getElementById('cl-month').value=thisMonth();
   showCleaningTab('monthly');
 }
@@ -1519,7 +1519,10 @@ function initSalesSummary(){
   if(row)row.style.display='none';
   renderSalesSummary();
 }
+let _ssRendering=false;
 async function renderSalesSummary(){
+  if(_ssRendering)return;
+  _ssRendering=true;
   const month=document.getElementById('ss-month').value;
   if(!month)return;
   const wrap=document.getElementById('ss-table-wrap');
@@ -1715,6 +1718,7 @@ async function renderSalesSummary(){
 
   h+=`</tbody></table>`;
   wrap.innerHTML=h;
+  _ssRendering=false;
 }
 function renderSettings(){renderCatTags('fm_stores');renderCatTags('division');renderCatTags('service');renderCatTags('route');}
 function renderCatTags(k){const el=document.getElementById('cat-'+k+'-tags');if(!el)return;el.innerHTML=(db.cats[k]||[]).map((c,i)=>`<span class="tag">${c}<button class="tag-del" onclick="removeCat('${k}',${i})">✕</button></span>`).join('');}
