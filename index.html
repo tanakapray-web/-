@@ -607,17 +607,21 @@ let editingDailyId=null; // 編集中の日報ID（nullなら新規作成）
 async function loadDB(){
   showLoading(true);
   try{
-    const [stores,users,daily,monthly,cats]=await Promise.all([
+    const [stores,users,daily,monthly,cats,cm,cmo]=await Promise.all([
       sbGet('stores','order=sort_order,created_at'),
       sbGet('users','order=created_at'),
       sbGet('daily','order=date.desc'),
       sbGet('monthly','order=month.desc'),
-      sbGet('cats','id=eq.1')
+      sbGet('cats','id=eq.1'),
+      sbGet('cleaning_masters','order=sort_order'),
+      sbGet('cleaning_monthly','')
     ]);
     db.stores=stores||[];
     db.users=(users||[]).map(u=>({...u,store_ids:u.store_ids||[u.store_id].filter(Boolean)}));
     db.daily=(daily||[]).map(d=>({...d,serviceRows:d.service_rows||[],stRows:d.st_rows||[],partRows:d.part_rows||[],storeId:d.store_id,createdAt:d.created_at}));
     db.monthly=(monthly||[]).map(m=>({...m,storeId:m.store_id,reportDate:m.report_date,zatsuRate:m.zatsu_rate,newContract:m.new_contract,newContractAmt:m.new_contract_amt,referralRcv:m.referral_rcv}));
+    db.cleaning_masters=cm||[];
+    db.cleaning_monthly=cmo||[];
     if(cats&&cats[0]){db.cats={service:cats[0].service||DEF_CATS,route:cats[0].route||DEF_ROUTES,division:cats[0].division||[],fm_stores:cats[0].fm_stores||[]};}
     if(!db.stores.length){
       await sbInsert('stores',{id:'s1',name:'プレイ平店',dept:'サービスマスター事業部',created_at:today()});
@@ -1565,6 +1569,15 @@ async function renderSalesSummary(){
         const sid=d.storeId||d.store_id;
         byStore[sid]=(byStore[sid]||0)+amt;
       });
+    });
+    // FM売上報告（cleaning_monthly）を加算
+    db.cleaning_monthly.filter(r=>r.month===m).forEach(rec=>{
+      const master=db.cleaning_masters.find(mas=>mas.id===rec.master_id);
+      if(!master||!master.store_id)return;
+      const amt=rec.amount_override!=null?Number(rec.amount_override):
+        (master.contract_type==='定額'?Number(master.unit_price||0):
+         Math.round(Number(master.unit_price||0)*(Number(rec.count)||0)));
+      if(amt>0)byStore[master.store_id]=(byStore[master.store_id]||0)+amt;
     });
     return byStore;
   }
