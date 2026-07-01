@@ -1301,7 +1301,14 @@ async function saveBudget(){const s=curBudgetStore();if(!s)return;const m=docume
 async function delBudget(m){const s=curBudgetStore();if(!s||!s.budgets)return;if(!confirm(m+' の予算を削除しますか？'))return;const prev={...s.budgets};const nb={...s.budgets};delete nb[m];s.budgets=nb;if(await persistBudgets(s)){renderBudgets();toast('削除しました');}else{s.budgets=prev;}}
 // ===== 売上報告 =====
 function myCleaningStores(){if(currentUser.role==='admin')return db.stores;const ids=currentUser.store_ids||currentUser.storeIds||[currentUser.storeId].filter(Boolean);return db.stores.filter(s=>ids.includes(s.id));}
-function clVisIds(){if(currentUser.role==='admin'){const f=document.getElementById('store-filter');return f&&f.value?[f.value]:db.stores.map(s=>s.id);}return currentUser.store_ids||currentUser.storeIds||[currentUser.storeId].filter(Boolean);}
+function clVisIds(){
+  // FM売上報告は「入力:」フィルターの店舗を使う（「閲覧:」ではなく）
+  const inputSel=document.getElementById('input-store-filter');
+  const inputId=inputSel?inputSel.value:'';
+  if(inputId)return[inputId];
+  if(currentUser.role==='admin')return db.stores.map(s=>s.id);
+  return currentUser.store_ids||currentUser.storeIds||[currentUser.storeId].filter(Boolean);
+}
 function getCleaningTotal(storeId,month){if(!db.cleaning_masters||!db.cleaning_monthly)return 0;const masters=db.cleaning_masters.filter(m=>m.store_id===storeId&&m.active!==false);const recs={};db.cleaning_monthly.filter(r=>r.month===month&&r.store_id===storeId).forEach(r=>recs[r.master_id]=r);return masters.reduce((sum,m)=>{const r=recs[m.id];const t=m.contract_type||'定額';const count=r?Number(r.count)||0:(t==='定額'?1:0);return sum+(r&&r.amount_override!=null?Number(r.amount_override):Math.round(Number(m.unit_price||0)*count));},0);}
 async function initCleaningPage(){
   try{const[ms,mo]=await Promise.all([sbFetch('cleaning_masters','order=sort_order.asc'),sbFetch('cleaning_monthly','')]);db.cleaning_masters=ms||[];db.cleaning_monthly=mo||[];}catch(e){db.cleaning_masters=db.cleaning_masters||[];db.cleaning_monthly=db.cleaning_monthly||[];}
