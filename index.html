@@ -597,7 +597,7 @@ async function loadDB(){
   showLoading(true);
   try{
     const [stores,users,daily,monthly,cats]=await Promise.all([
-      sbGet('stores','order=created_at'),
+      sbGet('stores','order=sort_order,created_at'),
       sbGet('users','order=created_at'),
       sbGet('daily','order=date.desc'),
       sbGet('monthly','order=month.desc'),
@@ -1192,7 +1192,44 @@ function viewMonthly(id){const m=db.monthly.find(r=>r.id===id);if(!m)return;docu
 async function delMonthly(id){if(!confirm('削除しますか？'))return;await sbDelete('monthly','id=eq.'+id);db.monthly=db.monthly.filter(m=>m.id!==id);renderMonthlyList();toast('削除しました');}
 
 // ADMIN STORES
-function renderStores(){document.getElementById('stores-tbody').innerHTML=db.stores.length===0?'<tr><td colspan="4" style="color:var(--text2);text-align:center;padding:20px;">部署がありません</td></tr>':db.stores.map(s=>`<tr><td><strong>${s.name}${s.dept?' '+s.dept:''}</strong></td><td class="td-sub"><span style="font-size:11px;padding:2px 7px;border-radius:4px;background:var(--bg3);color:var(--text2)">${s.division||'未設定'}</span></td><td class="td-sub">${s.created_at||s.createdAt||'—'}</td><td class="td-actions"><button class="btn btn-ghost btn-sm" onclick="openStoreModal('${s.id}')">編集</button><button class="btn btn-danger btn-sm" onclick="delStore('${s.id}')">削除</button></td></tr>`).join('');}
+function renderStores(){
+  const tbody=document.getElementById('stores-tbody');
+  if(!db.stores.length){tbody.innerHTML='<tr><td colspan="5" style="color:var(--text2);text-align:center;padding:20px;">部署がありません</td></tr>';return;}
+  tbody.innerHTML=db.stores.map((s,i)=>`
+    <tr draggable="true" data-id="${s.id}" data-idx="${i}" style="cursor:grab;"
+      ondragstart="storeDragStart(event,${i})"
+      ondragover="storeDragOver(event)"
+      ondrop="storeDrop(event,${i})"
+      ondragend="storeDragEnd(event)">
+      <td style="color:var(--text2);font-size:16px;width:24px;text-align:center;">⠿</td>
+      <td><strong>${s.name}${s.dept?' '+s.dept:''}</strong></td>
+      <td class="td-sub"><span style="font-size:11px;padding:2px 7px;border-radius:4px;background:var(--bg3);color:var(--text2)">${s.division||'未設定'}</span></td>
+      <td class="td-sub">${s.created_at||s.createdAt||'—'}</td>
+      <td class="td-actions">
+        <button class="btn btn-ghost btn-sm" onclick="openStoreModal('${s.id}')">編集</button>
+        <button class="btn btn-danger btn-sm" onclick="delStore('${s.id}')">削除</button>
+      </td>
+    </tr>`).join('');
+}
+let _dragIdx=null;
+function storeDragStart(e,idx){_dragIdx=idx;e.currentTarget.style.opacity='0.4';}
+function storeDragEnd(e){e.currentTarget.style.opacity='1';document.querySelectorAll('#stores-tbody tr').forEach(r=>r.style.borderTop='');}
+function storeDragOver(e){e.preventDefault();e.currentTarget.style.borderTop='2px solid var(--primary)';}
+function storeDrop(e,toIdx){
+  e.preventDefault();
+  if(_dragIdx===null||_dragIdx===toIdx)return;
+  const moved=db.stores.splice(_dragIdx,1)[0];
+  db.stores.splice(toIdx,0,moved);
+  _dragIdx=null;
+  renderStores();
+  saveStoreOrder();
+}
+async function saveStoreOrder(){
+  for(let i=0;i<db.stores.length;i++){
+    await sbFetch(`stores?id=eq.${db.stores[i].id}`,{method:'PATCH',body:JSON.stringify({sort_order:i})});
+  }
+  toast('並び順を保存しました');
+}
 function openStoreModal(id){const s=id?db.stores.find(x=>x.id===id):null;document.getElementById('store-modal-title').textContent=s?'部署編集':'部署追加';const fullName=s?(s.name+(s.dept?' '+s.dept:'')):'';document.getElementById('sm-deptname').value=fullName;document.getElementById('sm-division').innerHTML='<option value="">未設定</option>'+(db.cats.division||[]).map(d=>`<option value="${d}"${s&&s.division===d?' selected':''}>${d}</option>`).join('');document.getElementById('sm-edit-id').value=id||'';document.getElementById('store-modal').classList.add('open');}
 async function saveStore(){const name=document.getElementById('sm-deptname').value.trim();if(!name){alert('部署名を入力してください');return;}const eid=document.getElementById('sm-edit-id').value;const division=document.getElementById('sm-division').value;if(eid){await sbUpdate('stores','id=eq.'+eid,{name,dept:'',division});const s=db.stores.find(x=>x.id===eid);if(s){s.name=name;s.dept='';s.division=division;}}else{const newStore={id:'s'+uid(),name,dept:'',division,created_at:today()};await sbInsert('stores',newStore);db.stores.push(newStore);}closeModal('store-modal');renderStores();buildStoreFilter();toast(eid?'部署を更新しました':'部署を追加しました');}
 async function delStore(id){if(db.users.filter(u=>(u.store_id||u.storeId)===id).length>0){alert('この店舗のユーザーが存在します');return;}if(!confirm('削除しますか？'))return;await sbDelete('stores','id=eq.'+id);db.stores=db.stores.filter(s=>s.id!==id);renderStores();buildStoreFilter();toast('削除しました');}
