@@ -1586,7 +1586,7 @@ async function renderSalesSummary(){
   // セクション定義
   const sections=[
     {
-      label:'当\n月',
+      label:'当月',
       rows:[
         {label:'予算',      getter:(sid)=>getBudget(sid,month)},
         {label:'当月売上',  getter:(sid)=>byStoreCur[sid]||0},
@@ -1603,7 +1603,7 @@ async function renderSalesSummary(){
       }
     },
     {
-      label:'事\n業\n部\n別\n合\n計',
+      label:'事業部別合計',
       rows:[
         {label:'予算',      getter:(sid)=>divSum(stores.find(s=>s.id===sid)?.division||'',s=>getBudget(s,month))},
         {label:'当月売上',  getter:(sid)=>divSum(stores.find(s=>s.id===sid)?.division||'',s=>byStoreCur[s]||0)},
@@ -1620,7 +1620,7 @@ async function renderSalesSummary(){
       }
     },
     {
-      label:'部\n署\n別\n累\n計',
+      label:'部署別累計',
       rows:[
         {label:'予算',      getter:(sid)=>getBudgetYtd(sid)},
         {label:'当月売上',  getter:(sid)=>byStoreYtd[sid]||0},
@@ -1637,7 +1637,7 @@ async function renderSalesSummary(){
       }
     },
     {
-      label:'事\n業\n部\n別\n累\n計',
+      label:'事業部別累計',
       rows:[
         {label:'予算',      getter:(sid)=>divSum(stores.find(s=>s.id===sid)?.division||'',s=>getBudgetYtd(s))},
         {label:'当月売上',  getter:(sid)=>divSum(stores.find(s=>s.id===sid)?.division||'',s=>byStoreYtd[s]||0)},
@@ -1656,15 +1656,31 @@ async function renderSalesSummary(){
   ];
 
   sections.forEach(sec=>{
+    const isDivSection=sec.label==='事業部別合計'||sec.label==='事業部別累計';
     sec.rows.forEach((row,ri)=>{
       h+=`<tr>`;
-      if(ri===0)h+=`<td rowspan="5" style="border:1px solid var(--border);writing-mode:vertical-rl;text-align:center;font-weight:600;font-size:11px;background:var(--bg3);padding:4px 5px;white-space:pre-line;">${sec.label}</td>`;
+      if(ri===0){
+        const labelStyle=`border:1px solid var(--border);text-align:center;font-weight:600;font-size:11px;background:var(--bg3);padding:4px 8px;white-space:nowrap;`;
+        h+=`<td rowspan="5" style="${labelStyle}">${sec.label}</td>`;
+      }
       h+=`<td style="${TDL}">${row.label}</td>`;
-      stores.forEach(s=>{
-        const v=row.getter(s.id);
-        const display=row.isRate?v:fv(typeof v==='number'?v:0);
-        h+=`<td style="${TD}">${typeof v==='number'&&!row.isRate?fv(v):(row.isRate?v:'—')}</td>`;
-      });
+      if(isDivSection){
+        // 事業部ごとにcolspan結合
+        divNames.forEach(div=>{
+          const cnt=divGroups[div].length;
+          const sid=divGroups[div][0]?.id;
+          const v=sid?row.getter(sid):null;
+          const display=row.isRate?(v||'—'):(typeof v==='number'?fv(v):'—');
+          h+=`<td colspan="${cnt}" style="${TD}text-align:center;">${display}</td>`;
+        });
+      } else {
+        // 各店個別表示
+        stores.forEach(s=>{
+          const v=row.getter(s.id);
+          const display=row.isRate?(v||'—'):(typeof v==='number'?fv(v):'—');
+          h+=`<td style="${TD}">${display}</td>`;
+        });
+      }
       h+=`<td style="${TDT}">${sec.totalGetter(row.label)}</td>`;
       h+=`</tr>`;
     });
