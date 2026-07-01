@@ -1484,57 +1484,33 @@ async function saveSalesEdit(){
   else alert('保存に失敗しました');
 }
 // ===== 売上予定合計ページ =====
-let ssScopeKey='all';
 function initSalesSummary(){
   const el=document.getElementById('ss-month');
   if(!el.value)el.value=thisMonth();
-  buildSSScopeButtons();
+  // スコープボタンは不要（全体表示固定）
+  const row=document.getElementById('ss-scope-row');
+  if(row)row.style.display='none';
   renderSalesSummary();
 }
-function buildSSScopeButtons(){
-  const row=document.getElementById('ss-scope-row');if(!row)return;
-  const divs=db.cats.division||[];
-  const btns=[{key:'all',label:'全体'},...divs.map(d=>({key:'div:'+d,label:d}))];
-  row.innerHTML=btns.map(b=>`<button class="btn btn-sm ${ssScopeKey===b.key?'btn-primary':'btn-ghost'}" onclick="setSsScope('${b.key}')">${b.label}</button>`).join('');
-}
-function setSsScope(k){ssScopeKey=k;buildSSScopeButtons();renderSalesSummary();}
 async function renderSalesSummary(){
   const month=document.getElementById('ss-month').value;
   if(!month)return;
   const wrap=document.getElementById('ss-table-wrap');
   wrap.innerHTML='<div style="text-align:center;padding:40px;color:var(--text2);">読み込み中...</div>';
 
-  // スコープに応じた店舗リスト
-  let stores=db.stores;
-  if(ssScopeKey&&ssScopeKey.startsWith('div:')){
-    const divName=ssScopeKey.slice(4);
-    stores=db.stores.filter(s=>s.division===divName);
-  }
-
-  // 事業部グループ化（表示順はdb.storesの並び順通り）
-  const divGroups={};
-  stores.forEach(s=>{
-    const div=s.division||'未設定';
-    if(!divGroups[div])divGroups[div]=[];
-    divGroups[div].push(s);
-  });
-
-  // 売上データを取得（売上予定一覧と同じ基準）
+  // 売上データ取得（売上予定一覧と同じ基準）
   async function getSalesForMonth(m){
     const schedSales=await loadScheduleSales(m);
     const dailySrc=fbStore(db.daily).filter(d=>(d.date||'').startsWith(m));
     const dailyDates=new Set(dailySrc.map(d=>`${d.date}__${d.storeId||d.store_id}`));
     const overrides=db.sales_overrides.filter(o=>(o.date||'').startsWith(m));
     const ovMap={};overrides.forEach(o=>{ovMap[o.id]=o;});
-
     const byStore={};
-    // スケジュール予定（日報がない日のみ）
     schedSales.filter(s=>!dailyDates.has(`${s.date}__${s.store_id}`)&&s.date&&Number(s.amount)>0).forEach(s=>{
       const ov=ovMap['sched_'+s.id];
       const amt=Number(ov?ov.amount:s.amount)||0;
       byStore[s.store_id]=(byStore[s.store_id]||0)+amt;
     });
-    // 日報実績
     dailySrc.forEach(d=>{
       (d.serviceRows||[]).forEach((r,ri)=>{
         if(!r.name)return;
@@ -1553,104 +1529,149 @@ async function renderSalesSummary(){
   // 累計（4月〜当月）
   const [y,m2]=month.split('-').map(Number);
   const fyStart=m2>=4?`${y}-04`:`${y-1}-04`;
-  const months=[];let cur=fyStart;
-  while(cur<=month){months.push(cur);const [y2,m3]=cur.split('-').map(Number);const nm=m3===12?`${y2+1}-01`:`${y2}-${String(m3+1).padStart(2,'0')}`;cur=nm;}
+  const months=[];let cur2=fyStart;
+  while(cur2<=month){
+    months.push(cur2);
+    const [y2,m3]=cur2.split('-').map(Number);
+    cur2=m3===12?`${y2+1}-01`:`${y2}-${String(m3+1).padStart(2,'0')}`;
+  }
   const byStoreYtd={};
   for(const mo of months){
     const d=await getSalesForMonth(mo);
     Object.entries(d).forEach(([sid,amt])=>{byStoreYtd[sid]=(byStoreYtd[sid]||0)+amt;});
   }
 
-  // 前年・予算（月報から取得）
-  function getPrevYear(sid,mo){const r=db.monthly.find(x=>(x.storeId||x.store_id)===sid&&x.month===mo);return r?Number(r.lastyear)||0:0;}
-  function getBudget(sid,mo){return storeBudget(sid,mo);}
+  // ヘルパー関数
+  function getBudget(sid,m){return storeBudget(sid,m);}
+  function getPrevYear(sid,m){const r=db.monthly.find(x=>(x.storeId||x.store_id)===sid&&x.month===m);return r?Number(r.lastyear)||0:0;}
+  function getPrevYtd(sid){return months.reduce((a,mo)=>a+getPrevYear(sid,mo),0);}
+  function getBudgetYtd(sid){return months.reduce((a,mo)=>a+getBudget(sid,mo),0);}
+  function pct(a,b){return b>0?Math.round(a/b*100)+'%':'—';}
+  function fv(v){return v?fy(v):'—';}
 
-  // テーブル生成
-  const fy2=v=>v?fy(v):'—';
-  const pct=(a,b)=>b>0?Math.round(a/b*100)+'%':'—';
-
-  const divNames=Object.keys(divGroups);
-  let html=`<table style="border-collapse:collapse;font-size:12px;min-width:100%;">`;
-
-  // ヘッダー行1（事業部）
-  html+=`<thead><tr><th rowspan="2" style="${th()};min-width:80px;"></th>`;
-  divNames.forEach(div=>{
-    const cnt=divGroups[div].length;
-    html+=`<th colspan="${cnt}" style="${th()};text-align:center;background:var(--bg3);">${div}</th>`;
+  // 店舗リスト（sort_order順）
+  const stores=db.stores;
+  // 事業部グループ（順番維持）
+  const divNames=[];const divGroups={};
+  stores.forEach(s=>{
+    const div=s.division||'未設定';
+    if(!divNames.includes(div))divNames.push(div);
+    if(!divGroups[div])divGroups[div]=[];
+    divGroups[div].push(s);
   });
-  html+=`<th rowspan="2" style="${th()};text-align:center;background:var(--bg3);">合計</th></tr>`;
+
+  // 事業部合計を計算
+  function divSum(div,getter){return(divGroups[div]||[]).reduce((a,s)=>a+getter(s.id),0);}
+
+  // テーブル共通スタイル
+  const TH='border:1px solid var(--border);padding:5px 7px;background:var(--bg2);white-space:nowrap;';
+  const TD='border:1px solid var(--border);padding:4px 7px;text-align:right;font-family:"DM Mono",monospace;white-space:nowrap;';
+  const TDL='border:1px solid var(--border);padding:4px 7px;white-space:nowrap;font-size:11px;color:var(--text2);';
+  const TDT='border:1px solid var(--border);padding:4px 7px;text-align:right;font-weight:700;font-family:"DM Mono",monospace;background:var(--bg3);white-space:nowrap;';
+
+  let h=`<table style="border-collapse:collapse;font-size:12px;">`;
+
+  // ヘッダー行1（事業部名）
+  h+=`<thead><tr><th colspan="2" style="${TH}"></th>`;
+  divNames.forEach(div=>{
+    h+=`<th colspan="${divGroups[div].length}" style="${TH}text-align:center;">${div}</th>`;
+  });
+  h+=`<th style="${TH}text-align:center;">合計</th></tr>`;
 
   // ヘッダー行2（店舗名）
-  html+=`<tr>`;
-  divNames.forEach(div=>{
-    divGroups[div].forEach(s=>{
-      html+=`<th style="${th()};text-align:center;font-weight:600;min-width:70px;white-space:nowrap;">${s.name}</th>`;
-    });
-  });
-  html+=`</tr></thead><tbody>`;
+  h+=`<tr><th colspan="2" style="${TH}"></th>`;
+  stores.forEach(s=>{h+=`<th style="${TH}text-align:center;min-width:65px;">${s.name}</th>`;});
+  h+=`<th style="${TH}text-align:center;min-width:75px;">合計</th></tr></thead><tbody>`;
 
-  // セクション生成
-  function addSection(label,getVals){
-    const rows=[
-      {key:'budget',label:'予算'},
-      {key:'actual',label:'当月売上'},
-      {key:'lastyear',label:'前年売上'},
-      {key:'budgetRate',label:'予算比'},
-      {key:'lastRate',label:'前年同月比'},
-    ];
-    const isFirst=true;
-    rows.forEach((row,ri)=>{
-      html+=`<tr>`;
-      if(ri===0)html+=`<td rowspan="5" style="${td()};writing-mode:vertical-rl;text-align:center;font-weight:600;font-size:11px;background:var(--bg3);padding:4px 6px;">${label}</td>`;
-      html+=`<td style="${td()};font-size:11px;padding:6px 8px;color:var(--text2);white-space:nowrap;">${row.label}</td>`;
+  // セクション定義
+  const sections=[
+    {
+      label:'当\n月',
+      rows:[
+        {label:'予算',      getter:(sid)=>getBudget(sid,month)},
+        {label:'当月売上',  getter:(sid)=>byStoreCur[sid]||0},
+        {label:'前年売上',  getter:(sid)=>getPrevYear(sid,month)},
+        {label:'予算比',    getter:(sid)=>pct(byStoreCur[sid]||0,getBudget(sid,month)),isRate:true},
+        {label:'前年同月対比',getter:(sid)=>pct(byStoreCur[sid]||0,getPrevYear(sid,month)),isRate:true},
+      ],
+      totalGetter:(key)=>{
+        const tA=stores.reduce((a,s)=>a+(byStoreCur[s.id]||0),0);
+        const tB=stores.reduce((a,s)=>a+getBudget(s.id,month),0);
+        const tL=stores.reduce((a,s)=>a+getPrevYear(s.id,month),0);
+        if(key==='予算')return fv(tB);if(key==='当月売上')return fv(tA);if(key==='前年売上')return fv(tL);
+        if(key==='予算比')return pct(tA,tB);if(key==='前年同月対比')return pct(tA,tL);
+      }
+    },
+    {
+      label:'事\n業\n部\n別\n合\n計',
+      rows:[
+        {label:'予算',      getter:(sid)=>divSum(stores.find(s=>s.id===sid)?.division||'',s=>getBudget(s,month))},
+        {label:'当月売上',  getter:(sid)=>divSum(stores.find(s=>s.id===sid)?.division||'',s=>byStoreCur[s]||0)},
+        {label:'前年売上',  getter:(sid)=>divSum(stores.find(s=>s.id===sid)?.division||'',s=>getPrevYear(s,month))},
+        {label:'予算比',    getter:(sid)=>{const div=stores.find(s=>s.id===sid)?.division||'';const a=divSum(div,s=>byStoreCur[s]||0);const b=divSum(div,s=>getBudget(s,month));return pct(a,b);},isRate:true},
+        {label:'前年同月対比',getter:(sid)=>{const div=stores.find(s=>s.id===sid)?.division||'';const a=divSum(div,s=>byStoreCur[s]||0);const l=divSum(div,s=>getPrevYear(s,month));return pct(a,l);},isRate:true},
+      ],
+      totalGetter:(key)=>{
+        const tA=stores.reduce((a,s)=>a+(byStoreCur[s.id]||0),0);
+        const tB=stores.reduce((a,s)=>a+getBudget(s.id,month),0);
+        const tL=stores.reduce((a,s)=>a+getPrevYear(s.id,month),0);
+        if(key==='予算')return fv(tB);if(key==='当月売上')return fv(tA);if(key==='前年売上')return fv(tL);
+        if(key==='予算比')return pct(tA,tB);if(key==='前年同月対比')return pct(tA,tL);
+      }
+    },
+    {
+      label:'部\n署\n別\n累\n計',
+      rows:[
+        {label:'予算',      getter:(sid)=>getBudgetYtd(sid)},
+        {label:'当月売上',  getter:(sid)=>byStoreYtd[sid]||0},
+        {label:'前年売上',  getter:(sid)=>getPrevYtd(sid)},
+        {label:'予算比',    getter:(sid)=>pct(byStoreYtd[sid]||0,getBudgetYtd(sid)),isRate:true},
+        {label:'前年同月対比',getter:(sid)=>pct(byStoreYtd[sid]||0,getPrevYtd(sid)),isRate:true},
+      ],
+      totalGetter:(key)=>{
+        const tA=stores.reduce((a,s)=>a+(byStoreYtd[s.id]||0),0);
+        const tB=stores.reduce((a,s)=>a+getBudgetYtd(s.id),0);
+        const tL=stores.reduce((a,s)=>a+getPrevYtd(s.id),0);
+        if(key==='予算')return fv(tB);if(key==='当月売上')return fv(tA);if(key==='前年売上')return fv(tL);
+        if(key==='予算比')return pct(tA,tB);if(key==='前年同月対比')return pct(tA,tL);
+      }
+    },
+    {
+      label:'事\n業\n部\n別\n累\n計',
+      rows:[
+        {label:'予算',      getter:(sid)=>divSum(stores.find(s=>s.id===sid)?.division||'',s=>getBudgetYtd(s))},
+        {label:'当月売上',  getter:(sid)=>divSum(stores.find(s=>s.id===sid)?.division||'',s=>byStoreYtd[s]||0)},
+        {label:'前年売上',  getter:(sid)=>divSum(stores.find(s=>s.id===sid)?.division||'',s=>getPrevYtd(s))},
+        {label:'予算比',    getter:(sid)=>{const div=stores.find(s=>s.id===sid)?.division||'';const a=divSum(div,s=>byStoreYtd[s]||0);const b=divSum(div,s=>getBudgetYtd(s));return pct(a,b);},isRate:true},
+        {label:'前年同月対比',getter:(sid)=>{const div=stores.find(s=>s.id===sid)?.division||'';const a=divSum(div,s=>byStoreYtd[s]||0);const l=divSum(div,s=>getPrevYtd(s));return pct(a,l);},isRate:true},
+      ],
+      totalGetter:(key)=>{
+        const tA=stores.reduce((a,s)=>a+(byStoreYtd[s.id]||0),0);
+        const tB=stores.reduce((a,s)=>a+getBudgetYtd(s.id),0);
+        const tL=stores.reduce((a,s)=>a+getPrevYtd(s.id),0);
+        if(key==='予算')return fv(tB);if(key==='当月売上')return fv(tA);if(key==='前年売上')return fv(tL);
+        if(key==='予算比')return pct(tA,tB);if(key==='前年同月対比')return pct(tA,tL);
+      }
+    },
+  ];
 
-      let total_budget=0,total_actual=0,total_lastyear=0;
-      divNames.forEach(div=>{
-        divGroups[div].forEach(s=>{
-          const v=getVals(s.id,row.key);
-          if(row.key==='budget')total_budget+=v||0;
-          if(row.key==='actual')total_actual+=v||0;
-          if(row.key==='lastyear')total_lastyear+=v||0;
-          const isRate=row.key==='budgetRate'||row.key==='lastRate';
-          html+=`<td style="${td()};text-align:right;font-family:'DM Mono',monospace;">${isRate?(v||'—'):(v?fy(v):'—')}</td>`;
-        });
+  sections.forEach(sec=>{
+    sec.rows.forEach((row,ri)=>{
+      h+=`<tr>`;
+      if(ri===0)h+=`<td rowspan="5" style="border:1px solid var(--border);writing-mode:vertical-rl;text-align:center;font-weight:600;font-size:11px;background:var(--bg3);padding:4px 5px;white-space:pre-line;">${sec.label}</td>`;
+      h+=`<td style="${TDL}">${row.label}</td>`;
+      stores.forEach(s=>{
+        const v=row.getter(s.id);
+        const display=row.isRate?v:fv(typeof v==='number'?v:0);
+        h+=`<td style="${TD}">${typeof v==='number'&&!row.isRate?fv(v):(row.isRate?v:'—')}</td>`;
       });
-      // 合計列
-      if(row.key==='budget')html+=`<td style="${td(true)};text-align:right;">${fy(total_budget)}</td>`;
-      else if(row.key==='actual')html+=`<td style="${td(true)};text-align:right;">${fy(total_actual)}</td>`;
-      else if(row.key==='lastyear')html+=`<td style="${td(true)};text-align:right;">${fy(total_lastyear)}</td>`;
-      else if(row.key==='budgetRate')html+=`<td style="${td(true)};text-align:right;">${pct(total_actual,total_budget)}</td>`;
-      else if(row.key==='lastRate')html+=`<td style="${td(true)};text-align:right;">${pct(total_actual,total_lastyear)}</td>`;
-      html+=`</tr>`;
+      h+=`<td style="${TDT}">${sec.totalGetter(row.label)}</td>`;
+      h+=`</tr>`;
     });
-  }
-
-  function th(){return 'border:1px solid var(--border);padding:6px 8px;background:var(--bg2);';}
-  function td(bold=false){return `border:1px solid var(--border);padding:5px 8px;${bold?'font-weight:600;background:var(--bg3);':''}`;}
-
-  // 当月セクション
-  addSection('当\n月',( sid,key)=>{
-    if(key==='budget')return getBudget(sid,month);
-    if(key==='actual')return byStoreCur[sid]||0;
-    if(key==='lastyear')return getPrevYear(sid,month);
-    if(key==='budgetRate')return pct(byStoreCur[sid]||0,getBudget(sid,month));
-    if(key==='lastRate')return pct(byStoreCur[sid]||0,getPrevYear(sid,month));
   });
 
-  // 累計セクション
-  addSection('累\n計',(sid,key)=>{
-    if(key==='budget')return months.reduce((a,mo)=>a+getBudget(sid,mo),0);
-    if(key==='actual')return byStoreYtd[sid]||0;
-    if(key==='lastyear')return months.reduce((a,mo)=>a+getPrevYear(sid,mo),0);
-    const ytdB=months.reduce((a,mo)=>a+getBudget(sid,mo),0);
-    const ytdA=byStoreYtd[sid]||0;
-    const ytdL=months.reduce((a,mo)=>a+getPrevYear(sid,mo),0);
-    if(key==='budgetRate')return pct(ytdA,ytdB);
-    if(key==='lastRate')return pct(ytdA,ytdL);
-  });
-
-  html+=`</tbody></table>`;
-  wrap.innerHTML=html;
+  h+=`</tbody></table>`;
+  wrap.innerHTML=h;
 }
 function renderSettings(){renderCatTags('division');renderCatTags('service');renderCatTags('route');}
 function renderCatTags(k){const el=document.getElementById('cat-'+k+'-tags');el.innerHTML=(db.cats[k]||[]).map((c,i)=>`<span class="tag">${c}<button class="tag-del" onclick="removeCat('${k}',${i})">✕</button></span>`).join('');}
