@@ -505,7 +505,7 @@ tbody td{padding:10px 12px;color:var(--text);}
     <!-- ADMIN: SETTINGS -->
     <div class="page" id="page-admin-settings">
       <div class="page-header"><h1>マスタ設定</h1><p>区分・経路の選択肢をカスタマイズできます</p></div>
-      <div class="card"><div class="card-header"><div class="card-title">事業部</div></div><div style="font-size:11px;color:var(--text2);margin-bottom:10px;">店舗に割り当てる事業部名を管理します。追加した事業部は店舗編集画面で選択できます。</div><div class="tag-list" id="cat-division-tags"></div><div class="tag-add-row"><input type="text" class="form-input" id="cat-division-input" placeholder="例: SM事業部" style="max-width:200px;" onkeydown="if(event.key==='Enter')addCat('division')"><button class="btn btn-primary btn-sm" onclick="addCat('division')">追加</button></div></div>
+      <div class="card"><div class="card-header"><div class="card-title">FM請求店舗</div></div><div style="font-size:11px;color:var(--text2);margin-bottom:10px;">売上報告（FM）の顧客登録で使う請求先店舗を管理します。</div><div class="tag-list" id="cat-fm_stores-tags"></div><div class="tag-add-row"><input type="text" class="form-input" id="cat-fm_stores-input" placeholder="例: FM-A1" style="max-width:200px;" onkeydown="if(event.key==='Enter')addCat('fm_stores')"><button class="btn btn-primary btn-sm" onclick="addCat('fm_stores')">追加</button></div></div><div style="font-size:11px;color:var(--text2);margin-bottom:10px;">店舗に割り当てる事業部名を管理します。追加した事業部は店舗編集画面で選択できます。</div><div class="tag-list" id="cat-division-tags"></div><div class="tag-add-row"><input type="text" class="form-input" id="cat-division-input" placeholder="例: SM事業部" style="max-width:200px;" onkeydown="if(event.key==='Enter')addCat('division')"><button class="btn btn-primary btn-sm" onclick="addCat('division')">追加</button></div></div>
       <div class="card"><div class="card-header"><div class="card-title">サービス区分（デイリーの区分列）</div></div><div class="tag-list" id="cat-service-tags"></div><div class="tag-add-row"><input type="text" class="form-input" id="cat-service-input" placeholder="新しい区分名" style="max-width:200px;"><button class="btn btn-primary btn-sm" onclick="addCat('service')">追加</button></div></div>
       <div class="card"><div class="card-header"><div class="card-title">スポット獲得経路（共通デフォルト）</div></div><div style="font-size:11px;color:var(--text2);margin-bottom:10px;">各店舗で個別設定がない場合に使われます。店舗別はマネジャーが「経路設定」で変更できます。</div><div class="tag-list" id="cat-route-tags"></div><div class="tag-add-row"><input type="text" class="form-input" id="cat-route-input" placeholder="新しい経路名" style="max-width:200px;"><button class="btn btn-primary btn-sm" onclick="addCat('route')">追加</button></div></div>
     </div>
@@ -531,7 +531,7 @@ tbody td{padding:10px 12px;color:var(--text);}
         <div class="form-group" style="flex:1"><label class="form-label">契約種別</label><select class="form-input" id="cl-type"><option value="定額">定額</option><option value="回数制">回数制</option><option value="スポット">スポット</option><option value="その他売上">その他売上</option><option value="商品売上">商品売上</option></select></div>
         <div class="form-group" style="flex:1"><label class="form-label">単価（税抜）</label><input type="number" class="form-input" id="cl-price"></div>
       </div>
-      <div class="form-group"><label class="form-label">登録店舗</label><input type="text" class="form-input" id="cl-reg-store" placeholder="例: SM・HRP月輪"></div>
+      <div class="form-group"><label class="form-label">登録店舗</label><select class="form-input" id="cl-reg-store"></select></div>
       <div class="form-group"><label class="form-label">親契約（サブ契約の場合）</label><select class="form-input" id="cl-parent"><option value="">なし（親契約）</option></select></div>
       <div class="form-group"><label class="form-label">備考</label><input type="text" class="form-input" id="cl-note"></div>
       <input type="hidden" id="cl-edit-id">
@@ -617,7 +617,7 @@ async function loadDB(){
     db.users=(users||[]).map(u=>({...u,store_ids:u.store_ids||[u.store_id].filter(Boolean)}));
     db.daily=(daily||[]).map(d=>({...d,serviceRows:d.service_rows||[],stRows:d.st_rows||[],partRows:d.part_rows||[],storeId:d.store_id,createdAt:d.created_at}));
     db.monthly=(monthly||[]).map(m=>({...m,storeId:m.store_id,reportDate:m.report_date,zatsuRate:m.zatsu_rate,newContract:m.new_contract,newContractAmt:m.new_contract_amt,referralRcv:m.referral_rcv}));
-    if(cats&&cats[0]){db.cats={service:cats[0].service||DEF_CATS,route:cats[0].route||DEF_ROUTES,division:cats[0].division||[]};}
+    if(cats&&cats[0]){db.cats={service:cats[0].service||DEF_CATS,route:cats[0].route||DEF_ROUTES,division:cats[0].division||[],fm_stores:cats[0].fm_stores||[]};}
     if(!db.stores.length){
       await sbInsert('stores',{id:'s1',name:'プレイ平店',dept:'サービスマスター事業部',created_at:today()});
       await sbInsert('users',{id:'a1',name:'管理者',login_id:'admin',pw:'admin123',store_id:'s1',dept:'管理部',position:'管理者',role:'admin',created_at:today()});
@@ -1407,7 +1407,7 @@ function openCleaningMasterModal(id){
   document.getElementById('cl-name').value=m?m.name:'';
   document.getElementById('cl-no').value=m?m.contract_no||'':'';
   document.getElementById('cl-closing-date').value=m?m.closing_date||'':'';
-  document.getElementById('cl-reg-store').value=m?m.reg_store||'':'';
+  document.getElementById('cl-reg-store').innerHTML='<option value="">未選択</option>'+(db.cats.fm_stores||[]).map(s=>`<option value="${s}"${m&&m.reg_store===s?' selected':''}>${s}</option>`).join('');
   document.getElementById('cl-type').value=m?m.contract_type||'定額':'定額';
   document.getElementById('cl-price').value=m?m.unit_price||'':'';
   document.getElementById('cl-note').value=m?m.note||'':'';
@@ -1708,10 +1708,10 @@ async function renderSalesSummary(){
   h+=`</tbody></table>`;
   wrap.innerHTML=h;
 }
-function renderSettings(){renderCatTags('division');renderCatTags('service');renderCatTags('route');}
-function renderCatTags(k){const el=document.getElementById('cat-'+k+'-tags');el.innerHTML=(db.cats[k]||[]).map((c,i)=>`<span class="tag">${c}<button class="tag-del" onclick="removeCat('${k}',${i})">✕</button></span>`).join('');}
-async function addCat(k){const inp=document.getElementById('cat-'+k+'-input'),v=inp.value.trim();if(!v)return;if(db.cats[k].includes(v)){alert('すでに存在します');return;}db.cats[k].push(v);await sbUpsert('cats',{id:1,service:db.cats.service,route:db.cats.route,division:db.cats.division});inp.value='';renderCatTags(k);toast('追加しました');}
-async function removeCat(k,i){if(!confirm('削除しますか？'))return;db.cats[k].splice(i,1);await sbUpsert('cats',{id:1,service:db.cats.service,route:db.cats.route,division:db.cats.division});renderCatTags(k);toast('削除しました');}
+function renderSettings(){renderCatTags('fm_stores');renderCatTags('division');renderCatTags('service');renderCatTags('route');}
+function renderCatTags(k){const el=document.getElementById('cat-'+k+'-tags');if(!el)return;el.innerHTML=(db.cats[k]||[]).map((c,i)=>`<span class="tag">${c}<button class="tag-del" onclick="removeCat('${k}',${i})">✕</button></span>`).join('');}
+async function addCat(k){const inp=document.getElementById('cat-'+k+'-input'),v=inp.value.trim();if(!v)return;if((db.cats[k]||[]).includes(v)){alert('すでに存在します');return;}if(!db.cats[k])db.cats[k]=[];db.cats[k].push(v);await sbUpsert('cats',{id:1,service:db.cats.service,route:db.cats.route,division:db.cats.division,fm_stores:db.cats.fm_stores});inp.value='';renderCatTags(k);toast('追加しました');}
+async function removeCat(k,i){if(!confirm('削除しますか？'))return;db.cats[k].splice(i,1);await sbUpsert('cats',{id:1,service:db.cats.service,route:db.cats.route,division:db.cats.division,fm_stores:db.cats.fm_stores});renderCatTags(k);toast('削除しました');}
 
 // EXPORT
 function initExportPage(){const months=[...new Set([...db.daily.map(d=>(d.date||'').slice(0,7)),...db.monthly.map(m=>m.month)].filter(Boolean))].sort().reverse();['export-sales-month','export-daily-month','print-monthly-select','print-sales-select'].forEach(id=>{const el=document.getElementById(id);if(!el)return;const f=el.options[0].outerHTML;el.innerHTML=f+months.map(m=>`<option value="${m}">${m}</option>`).join('');});}
