@@ -96,7 +96,7 @@ tbody td{padding:10px 12px;color:var(--text);}
 .pill-red{background:rgba(248,113,113,.15);color:var(--red);}
 .pill-purple{background:rgba(124,92,252,.15);color:var(--accent2);}
 .pill-gray{background:rgba(136,146,164,.15);color:var(--text2);}
-/* 清掃台帳 */
+/* 売上報告 */
 .cl-table{border-collapse:collapse;width:100%;font-size:13px;margin-bottom:0;}
 .cl-table th{background:var(--bg3);padding:7px 10px;border:1px solid var(--border);text-align:left;font-size:11px;white-space:nowrap;}
 .cl-table td{padding:6px 10px;border:1px solid var(--border);vertical-align:middle;}
@@ -424,9 +424,9 @@ tbody td{padding:10px 12px;color:var(--text);}
     </div>
 
     <!-- EXPORT -->
-    <!-- 清掃台帳 -->
+    <!-- 売上報告 -->
     <div class="page" id="page-cleaning">
-      <div class="page-header"><h1>清掃台帳</h1><p>日常清掃の得意先ごとに月次売上を管理。月間運営報告の実績に自動反映されます。</p></div>
+      <div class="page-header"><h1>売上報告</h1><p>顧客ごとに月次売上を管理。月間運営報告の実績に自動反映されます。</p></div>
       <div class="card">
         <div style="display:flex;gap:8px;margin-bottom:18px;">
           <button id="cl-tab-monthly" class="btn btn-primary btn-sm" onclick="showCleaningTab('monthly')">月次入力</button>
@@ -442,7 +442,7 @@ tbody td{padding:10px 12px;color:var(--text);}
         </div>
         <!-- マスタ管理 -->
         <div id="cl-masters-view" style="display:none;">
-          <button class="btn btn-primary" style="margin-bottom:16px;" onclick="openCleaningMasterModal()">＋ 得意先を追加</button>
+          <button class="btn btn-primary" style="margin-bottom:16px;" onclick="openCleaningMasterModal()">＋ 顧客を追加</button>
           <div id="cl-masters-body"></div>
         </div>
       </div>
@@ -519,20 +519,21 @@ tbody td{padding:10px 12px;color:var(--text);}
 <!-- PRINT MODAL -->
 <div class="modal-overlay" id="cleaning-master-modal">
   <div class="modal">
-    <div class="modal-header"><div class="modal-title" id="cl-modal-title">得意先を追加</div><button class="modal-close" onclick="closeModal('cleaning-master-modal')">✕</button></div>
+    <div class="modal-header"><div class="modal-title" id="cl-modal-title">顧客を追加</div><button class="modal-close" onclick="closeModal('cleaning-master-modal')">✕</button></div>
     <div style="padding:0 4px;">
       <div class="form-group"><label class="form-label">店舗・部署 *</label><select class="form-input" id="cl-store-sel"></select></div>
-      <div class="form-group"><label class="form-label">得意先名 *</label><input type="text" class="form-input" id="cl-name" placeholder="例: 積水化学工業(株)水口工場 本館棟"></div>
+      <div class="form-group"><label class="form-label">顧客名 *</label><input type="text" class="form-input" id="cl-name"></div>
       <div style="display:flex;gap:12px;">
-        <div class="form-group" style="flex:1"><label class="form-label">契約No</label><input type="text" class="form-input" id="cl-no" placeholder="例: 1001970"></div>
-        <div class="form-group" style="flex:1"><label class="form-label">並び順</label><input type="number" class="form-input" id="cl-order" placeholder="10"></div>
+        <div class="form-group" style="flex:1"><label class="form-label">顧客コード</label><input type="text" class="form-input" id="cl-no"></div>
+        <div class="form-group" style="flex:1"><label class="form-label">締日</label><input type="text" class="form-input" id="cl-closing-date" placeholder="例: 月末、20日"></div>
       </div>
       <div style="display:flex;gap:12px;">
         <div class="form-group" style="flex:1"><label class="form-label">契約種別</label><select class="form-input" id="cl-type"><option value="定額">定額</option><option value="回数制">回数制</option><option value="スポット">スポット</option><option value="その他売上">その他売上</option><option value="商品売上">商品売上</option></select></div>
-        <div class="form-group" style="flex:1"><label class="form-label">単価（税抜）</label><input type="number" class="form-input" id="cl-price" placeholder="例: 120400"></div>
+        <div class="form-group" style="flex:1"><label class="form-label">単価（税抜）</label><input type="number" class="form-input" id="cl-price"></div>
       </div>
+      <div class="form-group"><label class="form-label">登録店舗</label><input type="text" class="form-input" id="cl-reg-store" placeholder="例: SM・HRP月輪"></div>
       <div class="form-group"><label class="form-label">親契約（サブ契約の場合）</label><select class="form-input" id="cl-parent"><option value="">なし（親契約）</option></select></div>
-      <div class="form-group"><label class="form-label">備考</label><input type="text" class="form-input" id="cl-note" placeholder="例: 2026.4より金額変更"></div>
+      <div class="form-group"><label class="form-label">備考</label><input type="text" class="form-input" id="cl-note"></div>
       <input type="hidden" id="cl-edit-id">
       <div class="modal-btns"><button class="btn" onclick="closeModal('cleaning-master-modal')">キャンセル</button><button class="btn btn-primary" onclick="saveCleaningMaster()">保存</button></div>
     </div>
@@ -1025,7 +1026,7 @@ function clearDaily(){document.getElementById('service-tbody').innerHTML='';docu
 function initMonthlyForm(){if(!document.getElementById('mr-month').value)document.getElementById('mr-month').value=thisMonth();if(!document.getElementById('mr-report-date').value)document.getElementById('mr-report-date').value=today();document.getElementById('mr-manager').value=currentUser.name;document.getElementById('mr-store').value=inputStoreName();autoFillMonthly();}
 function autoFillMonthly(){const month=document.getElementById('mr-month').value;if(!month)return;const dailies=db.daily.filter(d=>d.storeId===inputStoreId()&&(d.date||'').startsWith(month));let tot=0,cnt=0,pc=0,stPay=0,vis=0,est=0,con=0,tel=0,pos=0,ref=0;const byT={};dailies.forEach(d=>{(d.serviceRows||[]).forEach(r=>{if(!r.name)return;cnt++;const a=(Number(r.amount)||0)+(Number(r.otherSales)||0)+(Number(r.goodsSales)||0);tot+=a;const t=r.type||'その他';byT[t]=(byT[t]||0)+(Number(r.amount)||0);if(Number(r.otherSales)>0)byT['その他売上']=(byT['その他売上']||0)+(Number(r.otherSales)||0);if(Number(r.goodsSales)>0)byT['商品売上']=(byT['商品売上']||0)+(Number(r.goodsSales)||0);});stPay+=stTotal(d);pc+=partCnt(d);vis+=Number(d.visit)||0;est+=Number(d.estimate)||0;con+=Number(d.contract)||0;tel+=Number(d.tel)||0;pos+=Number(d.posting)||0;ref+=Number(d.referral)||0;});
   document.getElementById('mr-actual').value=tot||'';
-  // 清掃台帳の合計があれば上乗せ
+  // 売上報告の合計があれば上乗せ
   const _clt=getCleaningTotal(inputStoreId(),month);
   if(_clt>0){const _cur=Number(document.getElementById('mr-actual').value)||0;document.getElementById('mr-actual').value=_cur+_clt||'';}document.getElementById('mr-count').value=cnt||'';document.getElementById('mr-part').value=pc||'';document.getElementById('mr-est').value=est||'';document.getElementById('mr-visit').value=vis||'';document.getElementById('mr-tel').value=tel||'';document.getElementById('mr-post').value=pos||'';document.getElementById('mr-new').value=con||'';document.getElementById('mr-ref').value=ref||'';document.getElementById('mr-st-total').textContent=fy(stPay);
   const cats=db.cats.service||DEF_CATS;const col=Math.min(cats.length,4);const bg=document.getElementById('mr-breakdown-grid');bg.style.gridTemplateColumns=`repeat(${col},1fr)`;bg.innerHTML=cats.map(c=>`<div class="summary-item"><div class="summary-key">${c}</div><div class="summary-val" style="font-size:14px;">${fy(byT[c]||0)}</div></div>`).join('');calcMonthly();
@@ -1297,7 +1298,7 @@ function editBudget(m){const s=curBudgetStore();document.getElementById('budget-
 async function persistBudgets(s){const r=await sbUpdate('stores','id=eq.'+s.id,{budgets:s.budgets});if(r===null){toast('保存に失敗しました。storesテーブルにbudgets列が必要です');return false;}return true;}
 async function saveBudget(){const s=curBudgetStore();if(!s)return;const m=document.getElementById('budget-month').value;const amt=Number(document.getElementById('budget-amount').value)||0;if(!m){alert('対象月を選んでください');return;}if(amt<=0){alert('予算額を入力してください');return;}const prev=s.budgets?{...s.budgets}:undefined;s.budgets={...(s.budgets||{}),[m]:amt};if(await persistBudgets(s)){document.getElementById('budget-amount').value='';renderBudgets();toast('予算を保存しました');}else{s.budgets=prev;}}
 async function delBudget(m){const s=curBudgetStore();if(!s||!s.budgets)return;if(!confirm(m+' の予算を削除しますか？'))return;const prev={...s.budgets};const nb={...s.budgets};delete nb[m];s.budgets=nb;if(await persistBudgets(s)){renderBudgets();toast('削除しました');}else{s.budgets=prev;}}
-// ===== 清掃台帳 =====
+// ===== 売上報告 =====
 function myCleaningStores(){if(currentUser.role==='admin')return db.stores;const ids=currentUser.store_ids||currentUser.storeIds||[currentUser.storeId].filter(Boolean);return db.stores.filter(s=>ids.includes(s.id));}
 function clVisIds(){if(currentUser.role==='admin'){const f=document.getElementById('store-filter');return f&&f.value?[f.value]:db.stores.map(s=>s.id);}return currentUser.store_ids||currentUser.storeIds||[currentUser.storeId].filter(Boolean);}
 function getCleaningTotal(storeId,month){if(!db.cleaning_masters||!db.cleaning_monthly)return 0;const masters=db.cleaning_masters.filter(m=>m.store_id===storeId&&m.active!==false);const recs={};db.cleaning_monthly.filter(r=>r.month===month&&r.store_id===storeId).forEach(r=>recs[r.master_id]=r);return masters.reduce((sum,m)=>{const r=recs[m.id];const t=m.contract_type||'定額';const count=r?Number(r.count)||0:(t==='定額'?1:0);return sum+(r&&r.amount_override!=null?Number(r.amount_override):Math.round(Number(m.unit_price||0)*count));},0);}
@@ -1319,11 +1320,11 @@ function renderCleaningMonthly(){
   const sids=clVisIds();
   const masters=db.cleaning_masters.filter(m=>sids.includes(m.store_id)&&m.active!==false);
   const body=document.getElementById('cl-monthly-body');
-  if(!masters.length){body.innerHTML='<p style="color:var(--text2);padding:16px 0;">得意先が登録されていません。「マスタ管理」から追加してください。</p>';return;}
+  if(!masters.length){body.innerHTML='<p style="color:var(--text2);padding:16px 0;">顧客が登録されていません。「マスタ管理」から追加してください。</p>';return;}
   const recs={};db.cleaning_monthly.filter(r=>r.month===month&&sids.includes(r.store_id)).forEach(r=>recs[r.master_id]=r);
   const parents=masters.filter(m=>!m.parent_id);
   const childMap={};masters.filter(m=>m.parent_id).forEach(m=>{if(!childMap[m.parent_id])childMap[m.parent_id]=[];childMap[m.parent_id].push(m);});
-  let html=`<div style="overflow-x:auto"><table class="cl-table"><thead><tr><th style="min-width:200px">得意先名</th><th>種別</th><th class="cl-mono">単価(税抜)</th><th class="cl-mono">回数</th><th class="cl-mono" style="min-width:110px">実績(税抜)</th><th class="cl-mono">消費税</th><th class="cl-mono">税込合計</th><th>備考</th></tr></thead><tbody id="cl-tbody">`;
+  let html=`<div style="overflow-x:auto"><table class="cl-table"><thead><tr><th style="min-width:200px">顧客名</th><th>種別</th><th class="cl-mono">単価(税抜)</th><th class="cl-mono">回数</th><th class="cl-mono" style="min-width:110px">実績(税抜)</th><th class="cl-mono">消費税</th><th class="cl-mono">税込合計</th><th>備考</th></tr></thead><tbody id="cl-tbody">`;
   let grandBase=0;
   const rowHtml=(m,isChild)=>{
     const r=recs[m.id];const t=m.contract_type||'定額';
@@ -1376,21 +1377,39 @@ function renderCleaningMasters(){
   const sids=clVisIds();
   const masters=db.cleaning_masters.filter(m=>sids.includes(m.store_id));
   const body=document.getElementById('cl-masters-body');
-  if(!masters.length){body.innerHTML='<p style="color:var(--text2);">得意先が登録されていません。</p>';return;}
+  if(!masters.length){body.innerHTML='<p style="color:var(--text2);">顧客が登録されていません。</p>';return;}
   const parents=masters.filter(m=>!m.parent_id);const childMap={};masters.filter(m=>m.parent_id).forEach(m=>{if(!childMap[m.parent_id])childMap[m.parent_id]=[];childMap[m.parent_id].push(m);});
-  let html='<div style="overflow-x:auto"><table class="cl-table"><thead><tr><th style="min-width:200px">得意先名</th><th>契約No</th><th>種別</th><th class="cl-mono">単価(税抜)</th><th>備考</th><th>操作</th></tr></thead><tbody>';
-  const row=(m,c)=>`<tr><td style="${c?'padding-left:28px;color:var(--text2)':''}">${m.name}</td><td style="font-size:12px;color:var(--text3)">${m.contract_no||''}</td><td><span class="cl-ttag" style="${CL_TYPE_STYLE[m.contract_type||'定額']||''}">${m.contract_type||'定額'}</span></td><td class="cl-mono">${m.unit_price?fy(Number(m.unit_price)):''}</td><td style="font-size:12px;color:var(--text2)">${m.note||''}</td><td class="td-actions"><button class="btn btn-ghost btn-sm" onclick="openCleaningMasterModal('${m.id}')">編集</button><button class="btn btn-danger btn-sm" onclick="deleteCleaningMaster('${m.id}')">削除</button></td></tr>`;
-  parents.forEach(p=>{html+=row(p,false);(childMap[p.id]||[]).forEach(c=>{html+=row(c,true);});});
+  let html='<div style="overflow-x:auto"><table class="cl-table"><thead><tr><th style="width:24px;"></th><th style="min-width:200px">顧客名</th><th>顧客コード</th><th>種別</th><th class="cl-mono">単価(税抜)</th><th>備考</th><th>操作</th></tr></thead><tbody id="cl-masters-tbody">';
+  const rowFn=(m,c,i)=>`<tr draggable="${!c}" data-id="${m.id}" data-idx="${i}" style="cursor:${c?'default':'grab'}" ondragstart="clDragStart(event,${i})" ondragover="clDragOver(event)" ondrop="clDrop(event,${i})" ondragend="clDragEnd(event)"><td style="color:var(--text2);font-size:16px;text-align:center;">${c?'':'⠿'}</td><td style="${c?'padding-left:28px;color:var(--text2)':''}">${m.name}</td><td style="font-size:12px;color:var(--text3)">${m.contract_no||''}</td><td><span class="cl-ttag" style="${CL_TYPE_STYLE[m.contract_type||'定額']||''}">${m.contract_type||'定額'}</span></td><td class="cl-mono">${m.unit_price?fy(Number(m.unit_price)):''}</td><td style="font-size:12px;color:var(--text2)">${m.note||''}</td><td class="td-actions"><button class="btn btn-ghost btn-sm" onclick="openCleaningMasterModal('${m.id}')">編集</button><button class="btn btn-danger btn-sm" onclick="deleteCleaningMaster('${m.id}')">削除</button></td></tr>`;
+  let ci=0;
+  parents.forEach(p=>{html+=rowFn(p,false,ci++);(childMap[p.id]||[]).forEach(ch=>{html+=rowFn(ch,true,ci++);});});
   html+='</tbody></table></div>';body.innerHTML=html;
 }
+let _clDragIdx=null,_clDragSids=null;
+function clDragStart(e,idx){_clDragIdx=idx;_clDragSids=clVisIds();e.currentTarget.style.opacity='0.4';}
+function clDragEnd(e){e.currentTarget.style.opacity='1';document.querySelectorAll('#cl-masters-tbody tr').forEach(r=>r.style.borderTop='');}
+function clDragOver(e){e.preventDefault();e.currentTarget.style.borderTop='2px solid var(--primary)';}
+function clDrop(e,toIdx){
+  e.preventDefault();
+  if(_clDragIdx===null||_clDragIdx===toIdx)return;
+  const list=db.cleaning_masters.filter(m=>(_clDragSids||[]).includes(m.store_id));
+  const moved=list.splice(_clDragIdx,1)[0];
+  list.splice(toIdx,0,moved);
+  list.forEach((m,i)=>{m.sort_order=i;sbFetch('cleaning_masters?id=eq.'+m.id,'PATCH',{sort_order:i});});
+  _clDragIdx=null;
+  renderCleaningMasters();
+  toast('並び順を保存しました');
+}
+
 function openCleaningMasterModal(id){
   const m=id?db.cleaning_masters.find(x=>x.id===id):null;
-  document.getElementById('cl-modal-title').textContent=m?'得意先を編集':'得意先を追加';
+  document.getElementById('cl-modal-title').textContent=m?'顧客を編集':'顧客を追加';
   document.getElementById('cl-name').value=m?m.name:'';
   document.getElementById('cl-no').value=m?m.contract_no||'':'';
+  document.getElementById('cl-closing-date').value=m?m.closing_date||'':'';
+  document.getElementById('cl-reg-store').value=m?m.reg_store||'':'';
   document.getElementById('cl-type').value=m?m.contract_type||'定額':'定額';
   document.getElementById('cl-price').value=m?m.unit_price||'':'';
-  document.getElementById('cl-order').value=m?m.sort_order||'':'';
   document.getElementById('cl-note').value=m?m.note||'':'';
   document.getElementById('cl-edit-id').value=id||'';
   const sids=clVisIds();
@@ -1400,22 +1419,22 @@ function openCleaningMasterModal(id){
   document.getElementById('cleaning-master-modal').classList.add('open');
 }
 async function saveCleaningMaster(){
-  const name=document.getElementById('cl-name').value.trim();if(!name){alert('得意先名を入力してください');return;}
+  const name=document.getElementById('cl-name').value.trim();if(!name){alert('顧客名を入力してください');return;}
   const eid=document.getElementById('cl-edit-id').value;
-  const rec={name,contract_no:document.getElementById('cl-no').value.trim(),contract_type:document.getElementById('cl-type').value,unit_price:Number(document.getElementById('cl-price').value)||0,parent_id:document.getElementById('cl-parent').value||null,sort_order:Number(document.getElementById('cl-order').value)||0,note:document.getElementById('cl-note').value.trim(),store_id:document.getElementById('cl-store-sel').value,active:true};
+  const rec={name,contract_no:document.getElementById('cl-no').value.trim(),closing_date:document.getElementById('cl-closing-date').value.trim(),reg_store:document.getElementById('cl-reg-store').value.trim(),contract_type:document.getElementById('cl-type').value,unit_price:Number(document.getElementById('cl-price').value)||0,parent_id:document.getElementById('cl-parent').value||null,note:document.getElementById('cl-note').value.trim(),store_id:document.getElementById('cl-store-sel').value,active:true};
   if(eid){await sbUpdate('cleaning_masters','id=eq.'+eid,rec);const m=db.cleaning_masters.find(x=>x.id===eid);if(m)Object.assign(m,rec);}
   else{const nr={...rec,id:uid()};const res=await sbInsert('cleaning_masters',nr);if(res!==null)db.cleaning_masters.push(nr);}
   closeModal('cleaning-master-modal');renderCleaningMasters();toast(eid?'更新しました':'追加しました');
 }
 async function deleteCleaningMaster(id){
-  if(!confirm('削除しますか？この得意先の月次データも全て削除されます。'))return;
+  if(!confirm('削除しますか？この顧客の月次データも全て削除されます。'))return;
   await sbDelete('cleaning_masters','id=eq.'+id);
   await sbDelete('cleaning_monthly','master_id=eq.'+id);
   db.cleaning_masters=db.cleaning_masters.filter(m=>m.id!==id);
   db.cleaning_monthly=db.cleaning_monthly.filter(r=>r.master_id!==id);
   renderCleaningMasters();toast('削除しました');
 }
-// ===== 清掃台帳ここまで =====
+// ===== 売上報告ここまで =====
 function renderDashDivision(month){
   const el=document.getElementById('dash-division-section');if(!el)return;
   const r=currentUser.role;
