@@ -707,42 +707,37 @@ function buildStoreFilter(){
 }
 function onInputFilterChange(){
   activeInputStore=document.getElementById('input-store-filter').value;
+  // 入力を変えたら閲覧も同じ店舗に連動
+  const viewSel=document.getElementById('global-store-filter');
+  if(viewSel&&activeInputStore){
+    viewSel.value=activeInputStore;
+    activeStoreFilter=activeInputStore;
+  }
   updateStoreDisplay();
-  // デイリー入力フォームが開いてたら更新
   const dStore=document.getElementById('d-store');
   if(dStore)dStore.value=inputStoreName();
   const mrStore=document.getElementById('mr-store');
   if(mrStore)mrStore.value=inputStoreName();
-}
-
-function updateStoreDisplay(){
-  // 閲覧店舗名
-  let viewName='';
-  if(activeStoreFilter==='all'){viewName='全店舗';}
-  else{const st=db.stores.find(s=>s.id===activeStoreFilter)||{};viewName=(st.name||'—')+((st.dept&&st.dept.trim())?' '+st.dept.trim():'');}
-  // 入力店舗名
-  const ist=db.stores.find(s=>s.id===activeInputStore)||{};
-  const inputName=(ist.name||'—')+((ist.dept&&ist.dept.trim())?' '+ist.dept.trim():'');
-  // 左上: 入力店舗を表示
-  document.getElementById('sb-store-name').textContent=inputName;
-  // バナー: 閲覧と入力を両方表示
-  const banner=document.getElementById('banner-store-name');
-  if(banner){
-    if(viewName===inputName){
-      banner.textContent=inputName;
-    } else {
-      banner.innerHTML=`閲覧: <span style="color:var(--accent)">${viewName}</span>&nbsp;&nbsp;入力: <span style="color:var(--green)">${inputName}</span>`;
-    }
+  // 現ページを再描画
+  const activePage=document.querySelector('.page.active');
+  if(activePage){const id=activePage.id.replace('page-','');
+    if(id==='cleaning')initCleaningPage();
+    else if(id==='dashboard')renderDashboard();
+    else if(id==='sales-list')renderSalesList().catch(console.error);
+    else if(id==='daily-list')renderDailyList();
+    else if(id==='monthly-list')renderMonthlyList();
   }
-  // デイリー入力欄
-  const dStore=document.getElementById('d-store');if(dStore)dStore.value=inputStoreName();
-  const mrStore=document.getElementById('mr-store');if(mrStore)mrStore.value=inputStoreName();
 }
 
 function onViewFilterChange(){
   activeStoreFilter=document.getElementById('global-store-filter').value;
+  // 閲覧を変えたら入力も同じ店舗に連動（全店舗以外）
+  const inputSel=document.getElementById('input-store-filter');
+  if(inputSel&&activeStoreFilter&&activeStoreFilter!=='all'){
+    inputSel.value=activeStoreFilter;
+    activeInputStore=activeStoreFilter;
+  }
   updateStoreDisplay();
-  // 現在表示中のページを再描画
   const activePage=document.querySelector('.page.active');
   if(!activePage)return;
   const id=activePage.id.replace('page-','');
@@ -752,6 +747,25 @@ function onViewFilterChange(){
   else if(id==='monthly-list')renderMonthlyList();
   else if(id==='admin-sales')renderAdminSales();
   else if(id==='daily')initDailyForm();
+  else if(id==='cleaning')initCleaningPage();
+}
+function updateStoreDisplay(){
+  let viewName='';
+  if(activeStoreFilter==='all'){viewName='全店舗';}
+  else{const st=db.stores.find(s=>s.id===activeStoreFilter)||{};viewName=(st.name||'—')+((st.dept&&st.dept.trim())?' '+st.dept.trim():'');}
+  const ist=db.stores.find(s=>s.id===activeInputStore)||{};
+  const inputName=(ist.name||'—')+((ist.dept&&ist.dept.trim())?' '+ist.dept.trim():'');
+  document.getElementById('sb-store-name').textContent=inputName;
+  const banner=document.getElementById('banner-store-name');
+  if(banner){
+    if(viewName===inputName||activeStoreFilter==='all'){
+      banner.textContent=inputName;
+    } else {
+      banner.innerHTML=`閲覧: <span style="color:var(--accent)">${viewName}</span>&nbsp;&nbsp;入力: <span style="color:var(--green)">${inputName}</span>`;
+    }
+  }
+  const dStore=document.getElementById('d-store');if(dStore)dStore.value=inputStoreName();
+  const mrStore=document.getElementById('mr-store');if(mrStore)mrStore.value=inputStoreName();
 }
 const PT={'dashboard':'ダッシュボード','daily':'デイリーレポート入力','monthly-report':'月間運営報告','cleaning':'売上報告(FM)','sales-list':'売上予定一覧','sales-summary':'売上予定合計','daily-list':'日報一覧','monthly-list':'月間報告一覧','export':'エクスポート','store-routes':'スポット獲得経路の設定','budget':'予算設定','admin-stores':'店舗管理','admin-users':'アカウント管理','admin-settings':'マスタ設定'};
 function showPage(id){
@@ -769,6 +783,9 @@ function showPage(id){
     const VIEW_PAGES=['sales-list','daily-list','monthly-list'];
     if(id==='dashboard'){
       vfw.style.display=(r==='admin')?'flex':'none';
+      ifw.style.display='none';
+    } else if(id==='sales-summary'){
+      vfw.style.display='none';
       ifw.style.display='none';
     } else {
       vfw.style.display=INPUT_PAGES.includes(id)?'none':'flex';
@@ -1515,8 +1532,7 @@ function initSalesSummary(){
   const el=document.getElementById('ss-month');
   if(!el.value)el.value=thisMonth();
   // スコープボタンは不要（全体表示固定）
-  const row=document.getElementById('ss-scope-row');
-  if(row)row.style.display='none';
+  // スコープボタンなし・フィルター非表示（全員同じ表示）
   renderSalesSummary();
 }
 let _ssRendering=false;
