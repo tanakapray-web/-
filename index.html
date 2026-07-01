@@ -1226,7 +1226,7 @@ function storeDrop(e,toIdx){
 }
 async function saveStoreOrder(){
   for(let i=0;i<db.stores.length;i++){
-    await sbFetch(`stores?id=eq.${db.stores[i].id}`,{method:'PATCH',body:JSON.stringify({sort_order:i})});
+    await sbFetch(`stores?id=eq.${db.stores[i].id}`,'PATCH',{sort_order:i});
   }
   toast('並び順を保存しました');
 }
