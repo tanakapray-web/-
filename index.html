@@ -677,8 +677,6 @@ function startApp(){
 }
 function getUserFeatures(){
   const r=currentUser.role;
-  // 管理者・マネジャーは全機能
-  if(r==='admin'||r==='manager')return{input:['daily','monthly-report','cleaning'],view:['sales-list','sales-summary','daily-list','monthly-list']};
   const divs=currentUser.divisions||[];
   const features=db.cats.division_features||{};
   const inputSet=new Set();const viewSet=new Set();
@@ -687,8 +685,10 @@ function getUserFeatures(){
     (df.input||[]).forEach(k=>inputSet.add(k));
     (df.view||[]).forEach(k=>viewSet.add(k));
   });
-  // 設定がなければ一般権限で全部許可
-  if(!divs.length||(!inputSet.size&&!viewSet.size))return{input:['daily','monthly-report'],view:['sales-list','daily-list','monthly-list']};
+  // 設定がない・事業部未設定の場合はデフォルト全機能
+  if(!divs.length||(!inputSet.size&&!viewSet.size)){
+    return{input:['daily','monthly-report','cleaning'],view:['sales-list','sales-summary','daily-list','monthly-list']};
+  }
   return{input:[...inputSet],view:[...viewSet]};
 }
 function buildSidebar(activePage){
