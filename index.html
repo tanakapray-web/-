@@ -1353,15 +1353,20 @@ function renderCleaningMonthly(){
   const recs={};db.cleaning_monthly.filter(r=>r.month===month&&sids.includes(r.store_id)).forEach(r=>recs[r.master_id]=r);
   const parents=masters.filter(m=>!m.parent_id);
   const childMap={};masters.filter(m=>m.parent_id).forEach(m=>{if(!childMap[m.parent_id])childMap[m.parent_id]=[];childMap[m.parent_id].push(m);});
-  let html=`<div style="overflow-x:auto"><table class="cl-table"><thead><tr><th style="min-width:200px">顧客名</th><th>種別</th><th class="cl-mono">単価(税抜)</th><th class="cl-mono">回数</th><th class="cl-mono" style="min-width:110px">実績(税抜)</th><th class="cl-mono">消費税</th><th class="cl-mono">税込合計</th><th>備考</th></tr></thead><tbody id="cl-tbody">`;
-  let grandBase=0;
+  // 登録店ごとにグループ化
+  const storeGroups={};const storeOrder=[];
+  parents.forEach(p=>{
+    const st=p.reg_store||'未設定';
+    if(!storeGroups[st]){storeGroups[st]=[];storeOrder.push(st);}
+    storeGroups[st].push(p);
+  });
   const rowHtml=(m,isChild)=>{
     const r=recs[m.id];const t=m.contract_type||'定額';
     const isFixed=t==='定額';const isManual=t==='スポット'||t==='その他売上'||t==='商品売上';
     const defCount=isFixed?1:0;
     const count=r?Number(r.count)||0:defCount;
     const base=r&&r.amount_override!=null?Number(r.amount_override):Math.round(Number(m.unit_price||0)*count);
-    const tax=Math.floor(base*0.1);grandBase+=base;
+    const tax=Math.floor(base*0.1);
     const style=CL_TYPE_STYLE[t]||'';
     const countCell=isFixed?`<span style="font-family:'DM Mono',monospace;">1</span>`:`<input type="number" class="cl-input" id="cln-${m.id}" value="${count}" min="0" oninput="calcClRow('${m.id}',${Number(m.unit_price||0)},this.value)">`;
     const baseCell=isManual?`<input type="number" class="cl-amtinput" id="clb-${m.id}" value="${base||''}" min="0" oninput="calcClRowBase('${m.id}',this.value)">`:`<span id="clb-${m.id}" class="cl-mono">${base?fy(base):''}</span>`;
@@ -1376,13 +1381,54 @@ function renderCleaningMonthly(){
       <td><input type="text" class="cl-noteinput" id="clnote-${m.id}" value="${(r&&r.note)||''}" placeholder="備考"></td>
     </tr>`;
   };
-  parents.forEach(p=>{html+=rowHtml(p,false);(childMap[p.id]||[]).forEach(c=>{html+=rowHtml(c,true);});});
+  let grandBase=0;
+  let html='<div style="overflow-x:auto">';
+  storeOrder.forEach(storeName=>{
+    const storeParents=storeGroups[storeName];
+    // 締日ごとにグループ化
+    const dateGroups={};const dateOrder=[];
+    storeParents.forEach(p=>{
+      const cd=p.closing_date||'未設定';
+      if(!dateGroups[cd]){dateGroups[cd]=[];dateOrder.push(cd);}
+      dateGroups[cd].push(p);
+    });
+    let storeBase=0;
+    html+=`<div style="margin-bottom:20px;">
+      <div style="background:var(--bg3);border-radius:8px 8px 0 0;padding:8px 14px;font-weight:700;font-size:14px;border-bottom:2px solid var(--primary);">🏪 ${storeName}</div>`;
+    dateOrder.forEach(dateKey=>{
+      const dateParents=dateGroups[dateKey];
+      let dateBase=0;
+      html+=`<table class="cl-table"><thead><tr>
+        <th colspan="8" style="background:var(--bg2);text-align:left;padding:6px 12px;font-size:12px;color:var(--text2);">📅 ${dateKey}締め</th>
+      </tr><tr><th style="min-width:200px">顧客名</th><th>種別</th><th class="cl-mono">単価(税抜)</th><th class="cl-mono">回数</th><th class="cl-mono" style="min-width:110px">実績(税抜)</th><th class="cl-mono">消費税</th><th class="cl-mono">税込合計</th><th>備考</th></tr></thead><tbody>`;
+      dateParents.forEach(p=>{
+        html+=rowHtml(p,false);
+        (childMap[p.id]||[]).forEach(c=>{html+=rowHtml(c,true);});
+        const r=recs[p.id];const t=p.contract_type||'定額';const isFixed=t==='定額';
+        const count=r?Number(r.count)||0:(isFixed?1:0);
+        const base=r&&r.amount_override!=null?Number(r.amount_override):Math.round(Number(p.unit_price||0)*count);
+        dateBase+=base;
+        (childMap[p.id]||[]).forEach(c=>{const cr=recs[c.id];const ct=c.contract_type||'定額';const isC=ct==='定額';const cc=cr?Number(cr.count)||0:(isC?1:0);const cb=cr&&cr.amount_override!=null?Number(cr.amount_override):Math.round(Number(c.unit_price||0)*cc);dateBase+=cb;});
+      });
+      const dateTax=Math.floor(dateBase*0.1);
+      storeBase+=dateBase;
+      html+=`<tr class="cl-sum"><td colspan="4" style="text-align:left;">📅 ${dateKey}締め 小計</td><td class="cl-mono">${fy(dateBase)}</td><td class="cl-mono">${fy(dateTax)}</td><td class="cl-mono">${fy(dateBase+dateTax)}</td><td></td></tr>`;
+      html+=`</tbody></table>`;
+    });
+    const storeTax=Math.floor(storeBase*0.1);
+    grandBase+=storeBase;
+    html+=`<div style="background:var(--bg2);padding:8px 14px;font-weight:700;font-size:13px;text-align:right;border-top:2px solid var(--border);">🏪 ${storeName} 合計：税抜 ${fy(storeBase)}　税 ${fy(storeTax)}　税込 ${fy(storeBase+storeTax)}</div>
+    </div>`;
+  });
   const gt=Math.floor(grandBase*0.1);
-  html+=`<tr class="cl-sum"><td colspan="4" style="text-align:left;">合計</td><td class="cl-mono">${fy(grandBase)}</td><td class="cl-mono">${fy(gt)}</td><td class="cl-mono">${fy(grandBase+gt)}</td><td></td></tr>`;
-  html+=`</tbody></table></div>`;
-  html+=`<div style="margin-top:12px;padding:12px 16px;background:rgba(29,110,90,.08);border:1px solid rgba(29,110,90,.2);border-radius:10px;font-size:13px;">📊 税抜合計: <strong style="font-family:'DM Mono',monospace;font-size:15px;">${fy(grandBase)}</strong>　→ 月間運営報告の「売上実績」に「一括保存」後に自動上乗せされます</div>`;
+  html+=`<div style="margin-top:8px;padding:12px 16px;background:rgba(29,110,90,.08);border:1px solid rgba(29,110,90,.2);border-radius:10px;font-size:13px;">
+    📊 全合計 税抜: <strong style="font-family:'DM Mono',monospace;font-size:15px;">${fy(grandBase)}</strong>　消費税: ${fy(gt)}　税込: ${fy(grandBase+gt)}<br>
+    <span style="font-size:11px;color:var(--text2);">→ 月間運営報告の「売上実績」に「一括保存」後に自動上乗せされます</span>
+  </div>`;
+  html+='</div>';
   body.innerHTML=html;
 }
+
 function calcClRow(mid,unitPrice,countVal){const count=Number(countVal)||0;const base=Math.round(unitPrice*count);const tax=Math.floor(base*0.1);const be=document.getElementById('clb-'+mid);if(be&&be.tagName!=='INPUT')be.textContent=base?fy(base):'';document.getElementById('clt-'+mid).textContent=tax?fy(tax):'';document.getElementById('clh-'+mid).textContent=(base+tax)?fy(base+tax):'';}
 function calcClRowBase(mid,val){const base=Number(val)||0;const tax=Math.floor(base*0.1);document.getElementById('clt-'+mid).textContent=tax?fy(tax):'';document.getElementById('clh-'+mid).textContent=(base+tax)?fy(base+tax):'';}
 async function saveAllCleaningMonthly(){
@@ -1407,13 +1453,45 @@ function renderCleaningMasters(){
   const masters=db.cleaning_masters.filter(m=>sids.includes(m.store_id));
   const body=document.getElementById('cl-masters-body');
   if(!masters.length){body.innerHTML='<p style="color:var(--text2);">顧客が登録されていません。</p>';return;}
-  const parents=masters.filter(m=>!m.parent_id);const childMap={};masters.filter(m=>m.parent_id).forEach(m=>{if(!childMap[m.parent_id])childMap[m.parent_id]=[];childMap[m.parent_id].push(m);});
-  let html='<div style="overflow-x:auto"><table class="cl-table"><thead><tr><th style="width:24px;"></th><th style="min-width:200px">顧客名</th><th>顧客コード</th><th>種別</th><th class="cl-mono">単価(税抜)</th><th>備考</th><th>操作</th></tr></thead><tbody id="cl-masters-tbody">';
-  const rowFn=(m,c,i)=>`<tr draggable="${!c}" data-id="${m.id}" data-idx="${i}" style="cursor:${c?'default':'grab'}" ondragstart="clDragStart(event,${i})" ondragover="clDragOver(event)" ondrop="clDrop(event,${i})" ondragend="clDragEnd(event)"><td style="color:var(--text2);font-size:16px;text-align:center;">${c?'':'⠿'}</td><td style="${c?'padding-left:28px;color:var(--text2)':''}">${m.name}</td><td style="font-size:12px;color:var(--text3)">${m.contract_no||''}</td><td><span class="cl-ttag" style="${CL_TYPE_STYLE[m.contract_type||'定額']||''}">${m.contract_type||'定額'}</span></td><td class="cl-mono">${m.unit_price?fy(Number(m.unit_price)):''}</td><td style="font-size:12px;color:var(--text2)">${m.note||''}</td><td class="td-actions"><button class="btn btn-ghost btn-sm" onclick="openCleaningMasterModal('${m.id}')">編集</button><button class="btn btn-danger btn-sm" onclick="deleteCleaningMaster('${m.id}')">削除</button></td></tr>`;
+  const parents=masters.filter(m=>!m.parent_id);
+  const childMap={};masters.filter(m=>m.parent_id).forEach(m=>{if(!childMap[m.parent_id])childMap[m.parent_id]=[];childMap[m.parent_id].push(m);});
+  // 登録店ごとにグループ化
+  const storeGroups={};const storeOrder=[];
+  parents.forEach(p=>{
+    const st=p.reg_store||'未設定';
+    if(!storeGroups[st]){storeGroups[st]=[];storeOrder.push(st);}
+    storeGroups[st].push(p);
+  });
+  let html='<div>';
   let ci=0;
-  parents.forEach(p=>{html+=rowFn(p,false,ci++);(childMap[p.id]||[]).forEach(ch=>{html+=rowFn(ch,true,ci++);});});
-  html+='</tbody></table></div>';body.innerHTML=html;
+  storeOrder.forEach(storeName=>{
+    const storeParents=storeGroups[storeName];
+    // 締日ごとにグループ化
+    const dateGroups={};const dateOrder=[];
+    storeParents.forEach(p=>{
+      const cd=p.closing_date||'未設定';
+      if(!dateGroups[cd]){dateGroups[cd]=[];dateOrder.push(cd);}
+      dateGroups[cd].push(p);
+    });
+    html+=`<div style="margin-bottom:20px;">
+      <div style="background:var(--bg3);border-radius:8px 8px 0 0;padding:8px 14px;font-weight:700;font-size:14px;border-bottom:2px solid var(--primary);">🏪 ${storeName}</div>`;
+    dateOrder.forEach(dateKey=>{
+      html+=`<table class="cl-table"><thead><tr>
+        <th colspan="7" style="background:var(--bg2);text-align:left;padding:6px 12px;font-size:12px;color:var(--text2);">📅 ${dateKey}締め</th>
+      </tr><tr><th style="width:24px;"></th><th style="min-width:200px">顧客名</th><th>顧客コード</th><th>種別</th><th class="cl-mono">単価(税抜)</th><th>備考</th><th>操作</th></tr></thead><tbody id="cl-masters-tbody-${storeName}-${dateKey}">`;
+      dateGroups[dateKey].forEach(p=>{
+        const rowFn=(m,isChild)=>`<tr draggable="${!isChild}" data-id="${m.id}" data-idx="${ci}" style="cursor:${isChild?'default':'grab'}" ondragstart="clDragStart(event,${ci})" ondragover="clDragOver(event)" ondrop="clDrop(event,${ci})" ondragend="clDragEnd(event)"><td style="color:var(--text2);font-size:16px;text-align:center;">${isChild?'':'⠿'}</td><td style="${isChild?'padding-left:28px;color:var(--text2)':''}">${m.name}</td><td style="font-size:12px;color:var(--text3)">${m.contract_no||''}</td><td><span class="cl-ttag" style="${CL_TYPE_STYLE[m.contract_type||'定額']||''}">${m.contract_type||'定額'}</span></td><td class="cl-mono">${m.unit_price?fy(Number(m.unit_price)):''}</td><td style="font-size:12px;color:var(--text2)">${m.note||''}</td><td class="td-actions"><button class="btn btn-ghost btn-sm" onclick="openCleaningMasterModal('${m.id}')">編集</button><button class="btn btn-danger btn-sm" onclick="deleteCleaningMaster('${m.id}')">削除</button></td></tr>`;
+        html+=rowFn(p,false);ci++;
+        (childMap[p.id]||[]).forEach(c=>{html+=rowFn(c,true);ci++;});
+      });
+      html+=`</tbody></table>`;
+    });
+    html+=`</div>`;
+  });
+  html+='</div>';
+  body.innerHTML=html;
 }
+
 let _clDragIdx=null,_clDragSids=null;
 function clDragStart(e,idx){_clDragIdx=idx;_clDragSids=clVisIds();e.currentTarget.style.opacity='0.4';}
 function clDragEnd(e){e.currentTarget.style.opacity='1';document.querySelectorAll('#cl-masters-tbody tr').forEach(r=>r.style.borderTop='');}
