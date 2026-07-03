@@ -1147,12 +1147,14 @@ async function saveMonthly(){
 }
 
 // SALES LIST（schedulesテーブルからも取得）
-async function loadScheduleSales(month){
+async function loadScheduleSales(month, allStores=false){
   let query=`schedule_type=eq.service&select=*&order=date,start_time`;
   if(month)query+=`&date=gte.${month}-01&date=lte.${month}-31`;
-  // 現在ユーザーの店舗IDで絞り込み
-  const storeIds=visIds();
-  if(storeIds.length===1)query+=`&store_id=eq.${storeIds[0]}`;
+  if(!allStores){
+    // 現在ユーザーの店舗IDで絞り込み
+    const storeIds=visIds();
+    if(storeIds.length===1)query+=`&store_id=eq.${storeIds[0]}`;
+  }
   const res=await sbGet('schedules',query);
   return (res||[]).filter(s=>s.name&&!['休み','×','ＰＭ休み'].includes(s.name));
 }
@@ -1709,7 +1711,7 @@ async function renderSalesSummary(){
 
   // 売上データ取得（売上予定一覧と同じ基準）
   async function getSalesForMonth(m){
-    const schedSales=await loadScheduleSales(m);
+    const schedSales=await loadScheduleSales(m, true);
     const dailySrc=db.daily.filter(d=>(d.date||'').startsWith(m));
     const dailyDates=new Set(dailySrc.map(d=>`${d.date}__${d.storeId||d.store_id}`));
     const overrides=db.sales_overrides.filter(o=>(o.date||'').startsWith(m));
