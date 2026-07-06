@@ -1013,22 +1013,17 @@ async function loadScheduleForDate(){
   const date=document.getElementById('d-date').value;
   if(!date){document.getElementById('sched-import-bar').style.display='none';return;}
 
-  // 現在のユーザーの店舗IDに紐づくスケジュールを取得
-  const storeId=currentUser.storeId;
+  // 右上「入力:」で選択中の店舗を使う
+  const storeId=inputStoreId();
+  if(!storeId){document.getElementById('sched-import-bar').style.display='none';return;}
+
+  // 選択店舗 + 日付で絞り込み
   const res=await sbGet('schedules',`date=eq.${date}&store_id=eq.${storeId}&select=*&order=start_time`);
+  pendingSchedules=(res||[]);
 
-  if(!res||!res.length){
-    // 店舗指定がないスケジュールも探す（store_idがnullのもの）
-    const res2=await sbGet('schedules',`date=eq.${date}&store_id=is.null&select=*&order=start_time`);
-    if(!res2||!res2.length){document.getElementById('sched-import-bar').style.display='none';return;}
-    pendingSchedules=res2;
-  }else{
-    pendingSchedules=res;
-  }
-
-  // 休みなどを除外（nameが「休み」「×」のもの）
+  // 休み・不要な名前を除外
   pendingSchedules=pendingSchedules.filter(s=>s.name&&!['休み','×','ＰＭ休み'].includes(s.name));
-  // サービス予定だけ取り込む（見積・その他は除外。区分未設定の旧データは取り込む）
+  // サービス予定だけ（区分未設定の旧データは取り込む）
   pendingSchedules=pendingSchedules.filter(s=>!s.schedule_type||s.schedule_type==='service');
 
   if(!pendingSchedules.length){document.getElementById('sched-import-bar').style.display='none';return;}
