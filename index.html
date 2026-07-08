@@ -854,8 +854,17 @@ function updateStoreDisplay(){
 const PT={'dashboard':'ダッシュボード','daily':'デイリーレポート入力','monthly-report':'月間運営報告','cleaning':'売上報告(FM)','sales-list':'売上予定一覧','sales-summary':'売上予定合計','daily-list':'日報一覧','monthly-list':'月間報告一覧','export':'エクスポート','store-routes':'スポット獲得経路の設定','budget':'予算設定','admin-stores':'店舗管理','admin-users':'アカウント管理','admin-settings':'マスタ設定'};
 function showPage(id){
   const r=currentUser.role;
-  if(['monthly-report','sales-list','daily-list','monthly-list','export','cleaning','store-routes','budget'].includes(id)&&r==='general')return;
+  // 管理者メニューはadminのみ
   if(['admin-stores','admin-users','admin-sales','admin-settings'].includes(id)&&r!=='admin')return;
+  // 入力・閲覧ページは事業部機能設定でチェック（一般ユーザーも設定次第でアクセス可）
+  const featurePages=['daily','monthly-report','cleaning','sales-list','sales-summary','daily-list','monthly-list'];
+  if(featurePages.includes(id)&&r==='general'){
+    const feat=getUserFeatures();
+    const allowed=[...feat.input,...feat.view];
+    if(!allowed.includes(id))return;
+  }
+  // ツールページはマネジャー以上
+  if(['export','store-routes','budget'].includes(id)&&r==='general')return;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   const pg=document.getElementById('page-'+id);if(pg)pg.classList.add('active');
   document.getElementById('topbar-title').textContent=PT[id]||id;
