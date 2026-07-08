@@ -1593,7 +1593,8 @@ function openCleaningMasterModal(id){
   document.getElementById('cl-name').value=m?m.name:'';
   document.getElementById('cl-no').value=m?m.contract_no||'':'';
   document.getElementById('cl-billing-code').value=m?m.billing_code||'':'';
-  document.getElementById('cl-closing-date').value=m?m.closing_date||'':'';'<option value="">未選択</option>'+(db.cats.fm_stores||[]).map(s=>`<option value="${s}"${m&&m.reg_store===s?' selected':''}>${s}</option>`).join('');
+  document.getElementById('cl-closing-date').value=m?m.closing_date||'':'';
+  document.getElementById('cl-reg-store').innerHTML='<option value="">未選択</option>'+(db.cats.fm_stores||[]).map(s=>`<option value="${s}"${m&&m.reg_store===s?' selected':''}>${s}</option>`).join('');
   document.getElementById('cl-type').value=m?m.contract_type||'定額':'定額';
   document.getElementById('cl-price').value=m?m.unit_price||'':'';
   document.getElementById('cl-note').value=m?m.note||'':'';
