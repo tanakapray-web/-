@@ -163,7 +163,16 @@ tbody td{padding:10px 12px;color:var(--text);}
 .sched-import-bar{background:rgba(124,92,252,.08);border:1px solid rgba(124,92,252,.25);border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
 .sched-import-info{font-size:13px;color:var(--accent2);}
 .sched-import-count{font-size:12px;color:var(--text2);margin-top:2px;}
+@keyframes spin{to{transform:rotate(360deg)}}
 @media print{body{background:#fff!important;color:#000!important;}.sidebar,.topbar,.btn,.modal-close,.no-print,#toast{display:none!important;}.main{margin-left:0!important;}.modal-overlay{display:block!important;position:static!important;background:#fff!important;}.modal{border:none!important;background:#fff!important;color:#000!important;max-height:none!important;width:100%!important;padding:0!important;}.print-area *{color:#000!important;background:#fff!important;border-color:#ccc!important;}}
+@media(max-width:768px){
+  .sidebar{transform:translateX(-100%);transition:transform .25s ease;}
+  .sidebar.open{transform:translateX(0);}
+  .main{margin-left:0!important;}
+  #hamburger-btn{display:block!important;}
+  #sidebar-overlay{display:block;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:99;opacity:0;pointer-events:none;transition:opacity .25s;}
+  #sidebar-overlay.open{opacity:1;pointer-events:auto;}
+}
 
 .xls{border-collapse:collapse;width:100%;font-size:12px;margin-bottom:18px;}
 .xls th,.xls td{border:1px solid var(--border);padding:5px 8px;text-align:left;vertical-align:top;}
@@ -197,8 +206,9 @@ tbody td{padding:10px 12px;color:var(--text);}
 </div>
 
 <div id="app">
+<div id="sidebar-overlay" onclick="toggleSidebar()"></div>
 <div class="layout">
-<nav class="sidebar">
+<nav class="sidebar" id="main-sidebar">
   <div class="logo"><div class="mark">PRAY HIRA</div><h2>売上・運営管理</h2><div class="sub" id="sb-store-name">—</div></div>
   <div class="nav" id="sidebar-nav"></div>
   <div class="sidebar-footer">
@@ -208,7 +218,10 @@ tbody td{padding:10px 12px;color:var(--text);}
 </nav>
 <div class="main">
   <div class="topbar">
-    <div class="topbar-title" id="topbar-title">ダッシュボード</div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button id="hamburger-btn" onclick="toggleSidebar()" style="display:none;background:none;border:none;cursor:pointer;font-size:20px;color:var(--text);padding:4px 8px;line-height:1;">☰</button>
+      <div class="topbar-title" id="topbar-title">ダッシュボード</div>
+    </div>
     <div class="topbar-right">
       <div id="store-filter-wrap" style="display:none;align-items:center;gap:12px;">
         <div id="view-filter-wrap" style="display:flex;align-items:center;gap:6px;">
@@ -220,6 +233,7 @@ tbody td{padding:10px 12px;color:var(--text);}
           <select id="input-store-filter" onchange="onInputFilterChange()" style="background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:4px 10px;color:var(--text);font-size:12px;font-family:'Noto Sans JP',sans-serif;outline:none;cursor:pointer;"></select>
         </div>
       </div>
+      <button onclick="refreshApp()" title="データを更新" style="background:none;border:1px solid var(--border);border-radius:7px;cursor:pointer;color:var(--text2);font-size:16px;padding:4px 8px;line-height:1;" id="refresh-btn">🔄</button>
       <span id="topbar-date" class="badge"></span>
     </div>
   </div>
@@ -692,6 +706,22 @@ function getUserFeatures(){
   }
   return{input:[...inputSet],view:[...viewSet]};
 }
+function toggleSidebar(){
+  const sb=document.getElementById('main-sidebar');
+  const ov=document.getElementById('sidebar-overlay');
+  sb.classList.toggle('open');
+  ov.classList.toggle('open');
+}
+async function refreshApp(){
+  const btn=document.getElementById('refresh-btn');
+  if(btn){btn.style.animation='spin .6s linear';btn.textContent='🔄';}
+  await loadDB();
+  // 現在のページを再描画
+  const activePage=document.querySelector('.page.active');
+  if(activePage){const id=activePage.id.replace('page-','');showPage(id);}
+  if(btn){btn.style.animation='';}
+  toast('データを更新しました');
+}
 function buildSidebar(activePage){
   const r=currentUser.role;
   const feat=getUserFeatures();
@@ -886,6 +916,9 @@ function showPage(id){
     }
   }
   buildSidebar(id);
+  // モバイルでページ遷移時にサイドバーを閉じる
+  document.getElementById('main-sidebar')?.classList.remove('open');
+  document.getElementById('sidebar-overlay')?.classList.remove('open');
   // ページに応じてフィルターを更新
   if(typeof updateFiltersForPage==='function')updateFiltersForPage(id);
   if(id==='dashboard')renderDashboard();else if(id==='daily')initDailyForm();else if(id==='monthly-report')initMonthlyForm();else if(id==='sales-list')renderSalesList().catch(console.error);else if(id==='sales-summary')initSalesSummary();else if(id==='daily-list')renderDailyList();else if(id==='monthly-list')renderMonthlyList();else if(id==='export')initExportPage();else if(id==='cleaning')initCleaningPage();else if(id==='store-routes')initStoreRoutes();else if(id==='budget')initBudgets();else if(id==='admin-stores')renderStores();else if(id==='admin-users')renderUsers();else if(id==='admin-settings')renderSettings();
