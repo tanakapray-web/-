@@ -1620,19 +1620,21 @@ function renderCleaningMasters(){
 }
 
 async function clMoveChildUp(id,parentId){
-  const children=(db.cleaning_masters.filter(m=>m.parent_id===parentId)).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
+  const children=db.cleaning_masters.filter(m=>m.parent_id===parentId).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
+  children.forEach((m,i)=>{m.sort_order=i*10;});
   const idx=children.findIndex(m=>m.id===id);
   if(idx<=0)return;
   [children[idx-1].sort_order,children[idx].sort_order]=[children[idx].sort_order,children[idx-1].sort_order];
-  await Promise.all([sbFetch('cleaning_masters?id=eq.'+children[idx-1].id,'PATCH',{sort_order:children[idx-1].sort_order}),sbFetch('cleaning_masters?id=eq.'+children[idx].id,'PATCH',{sort_order:children[idx].sort_order})]);
+  await Promise.all(children.map(m=>sbFetch('cleaning_masters?id=eq.'+m.id,'PATCH',{sort_order:m.sort_order})));
   renderCleaningMasters();
 }
 async function clMoveChildDown(id,parentId){
-  const children=(db.cleaning_masters.filter(m=>m.parent_id===parentId)).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
+  const children=db.cleaning_masters.filter(m=>m.parent_id===parentId).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
+  children.forEach((m,i)=>{m.sort_order=i*10;});
   const idx=children.findIndex(m=>m.id===id);
   if(idx<0||idx>=children.length-1)return;
   [children[idx].sort_order,children[idx+1].sort_order]=[children[idx+1].sort_order,children[idx].sort_order];
-  await Promise.all([sbFetch('cleaning_masters?id=eq.'+children[idx].id,'PATCH',{sort_order:children[idx].sort_order}),sbFetch('cleaning_masters?id=eq.'+children[idx+1].id,'PATCH',{sort_order:children[idx+1].sort_order})]);
+  await Promise.all(children.map(m=>sbFetch('cleaning_masters?id=eq.'+m.id,'PATCH',{sort_order:m.sort_order})));
   renderCleaningMasters();
 }
 function getGroupParents(storeName,dateKey){
@@ -1642,24 +1644,20 @@ function getGroupParents(storeName,dateKey){
 }
 async function clMoveUp(id,storeName,dateKey){
   const group=getGroupParents(storeName,dateKey);
+  group.forEach((m,i)=>{m.sort_order=i*10;});
   const idx=group.findIndex(m=>m.id===id);
   if(idx<=0)return;
   [group[idx-1].sort_order,group[idx].sort_order]=[group[idx].sort_order,group[idx-1].sort_order];
-  await Promise.all([
-    sbFetch('cleaning_masters?id=eq.'+group[idx-1].id,'PATCH',{sort_order:group[idx-1].sort_order}),
-    sbFetch('cleaning_masters?id=eq.'+group[idx].id,'PATCH',{sort_order:group[idx].sort_order})
-  ]);
+  await Promise.all(group.map(m=>sbFetch('cleaning_masters?id=eq.'+m.id,'PATCH',{sort_order:m.sort_order})));
   renderCleaningMasters();
 }
 async function clMoveDown(id,storeName,dateKey){
   const group=getGroupParents(storeName,dateKey);
+  group.forEach((m,i)=>{m.sort_order=i*10;});
   const idx=group.findIndex(m=>m.id===id);
   if(idx<0||idx>=group.length-1)return;
   [group[idx].sort_order,group[idx+1].sort_order]=[group[idx+1].sort_order,group[idx].sort_order];
-  await Promise.all([
-    sbFetch('cleaning_masters?id=eq.'+group[idx].id,'PATCH',{sort_order:group[idx].sort_order}),
-    sbFetch('cleaning_masters?id=eq.'+group[idx+1].id,'PATCH',{sort_order:group[idx+1].sort_order})
-  ]);
+  await Promise.all(group.map(m=>sbFetch('cleaning_masters?id=eq.'+m.id,'PATCH',{sort_order:m.sort_order})));
   renderCleaningMasters();
 }
 
