@@ -1574,7 +1574,7 @@ function renderCleaningMasters(){
   const masters=db.cleaning_masters.filter(m=>sids.includes(m.store_id));
   const body=document.getElementById('cl-masters-body');
   if(!masters.length){body.innerHTML='<p style="color:var(--text2);">顧客が登録されていません。</p>';return;}
-  const parents=masters.filter(m=>!m.parent_id);
+  const parents=masters.filter(m=>!m.parent_id).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
   const childMap={};masters.filter(m=>m.parent_id).forEach(m=>{if(!childMap[m.parent_id])childMap[m.parent_id]=[];childMap[m.parent_id].push(m);});
   const storeGroups={};const storeOrder=[];
   parents.forEach(p=>{
@@ -1594,26 +1594,18 @@ function renderCleaningMasters(){
     html+=`<div style="margin-bottom:20px;">
       <div style="background:var(--bg3);border-radius:8px 8px 0 0;padding:8px 14px;font-weight:700;font-size:14px;border-bottom:2px solid var(--primary);">🏪 ${storeName}</div>`;
     dateOrder.forEach(dateKey=>{
-      const groupId='grp_'+storeName.replace(/[^a-zA-Z0-9]/g,'_')+'_'+dateKey.replace(/[^a-zA-Z0-9]/g,'_');
+      const groupParents=dateGroups[dateKey];
       html+=`<table class="cl-table"><thead><tr>
-        <th colspan="7" style="background:var(--bg2);text-align:left;padding:6px 12px;font-size:12px;color:var(--text2);">📅 ${dateKey}締め</th>
-      </tr><tr><th style="width:24px;"></th><th style="min-width:200px">顧客名</th><th>顧客コード</th><th>種別</th><th class="cl-mono">単価(税抜)</th><th>備考</th><th>操作</th></tr></thead><tbody id="${groupId}">`;
-      dateGroups[dateKey].forEach((p,pi)=>{
-        const rowFn=(m,isChild,idx)=>`<tr draggable="${!isChild}" data-id="${m.id}" data-gid="${groupId}" data-idx="${idx}" style="cursor:${isChild?'default':'grab'}" 
-          ondragstart="clDragStart(event,'${groupId}',${idx})" 
-          ondragover="clDragOver(event)" 
-          ondrop="clDrop(event,'${groupId}',${idx})" 
-          ondragend="clDragEnd(event)">
-          <td style="color:var(--text2);font-size:16px;text-align:center;">${isChild?'':'⠿'}</td>
-          <td style="${isChild?'padding-left:28px;color:var(--text2)':''}">${m.name}</td>
-          <td style="font-size:12px;color:var(--text3)">${m.contract_no||''}</td>
-          <td><span class="cl-ttag" style="${CL_TYPE_STYLE[m.contract_type||'定額']||''}">${m.contract_type||'定額'}</span></td>
-          <td class="cl-mono">${m.unit_price?fy(Number(m.unit_price)):''}</td>
-          <td style="font-size:12px;color:var(--text2)">${m.note||''}</td>
-          <td class="td-actions"><button class="btn btn-ghost btn-sm" onclick="openCleaningMasterModal('${m.id}')">編集</button><button class="btn btn-danger btn-sm" onclick="deleteCleaningMaster('${m.id}')">削除</button></td>
-        </tr>`;
-        html+=rowFn(p,false,pi);
-        (childMap[p.id]||[]).forEach((c,ci)=>{html+=rowFn(c,true,pi);});
+        <th colspan="8" style="background:var(--bg2);text-align:left;padding:6px 12px;font-size:12px;color:var(--text2);">📅 ${dateKey}締め</th>
+      </tr><tr><th style="width:60px;text-align:center;">順番</th><th style="min-width:200px">顧客名</th><th>顧客コード</th><th>種別</th><th class="cl-mono">単価(税抜)</th><th>備考</th><th>操作</th></tr></thead><tbody>`;
+      groupParents.forEach((p,pi)=>{
+        const isFirst=pi===0;const isLast=pi===groupParents.length-1;
+        const upBtn=isFirst?`<button class="btn btn-sm" style="opacity:.3;cursor:default;" disabled>↑</button>`:`<button class="btn btn-sm" onclick="clMoveUp('${p.id}','${storeName}','${dateKey}')">↑</button>`;
+        const dnBtn=isLast?`<button class="btn btn-sm" style="opacity:.3;cursor:default;" disabled>↓</button>`:`<button class="btn btn-sm" onclick="clMoveDown('${p.id}','${storeName}','${dateKey}')">↓</button>`;
+        html+=`<tr data-id="${p.id}"><td style="text-align:center;">${upBtn}${dnBtn}</td><td>${p.name}</td><td style="font-size:12px;color:var(--text3)">${p.contract_no||''}</td><td><span class="cl-ttag" style="${CL_TYPE_STYLE[p.contract_type||'定額']||''}">${p.contract_type||'定額'}</span></td><td class="cl-mono">${p.unit_price?fy(Number(p.unit_price)):''}</td><td style="font-size:12px;color:var(--text2)">${p.note||''}</td><td class="td-actions"><button class="btn btn-ghost btn-sm" onclick="openCleaningMasterModal('${p.id}')">編集</button><button class="btn btn-danger btn-sm" onclick="deleteCleaningMaster('${p.id}')">削除</button></td></tr>`;
+        (childMap[p.id]||[]).forEach(c=>{
+          html+=`<tr><td></td><td style="padding-left:28px;color:var(--text2)">${c.name}</td><td style="font-size:12px;color:var(--text3)">${c.contract_no||''}</td><td><span class="cl-ttag" style="${CL_TYPE_STYLE[c.contract_type||'定額']||''}">${c.contract_type||'定額'}</span></td><td class="cl-mono">${c.unit_price?fy(Number(c.unit_price)):''}</td><td style="font-size:12px;color:var(--text2)">${c.note||''}</td><td class="td-actions"><button class="btn btn-ghost btn-sm" onclick="openCleaningMasterModal('${c.id}')">編集</button><button class="btn btn-danger btn-sm" onclick="deleteCleaningMaster('${c.id}')">削除</button></td></tr>`;
+        });
       });
       html+=`</tbody></table>`;
     });
@@ -1623,32 +1615,32 @@ function renderCleaningMasters(){
   body.innerHTML=html;
 }
 
-let _clDragIdx=null,_clDragGid=null;
-function clDragStart(e,gid,idx){_clDragIdx=idx;_clDragGid=gid;e.currentTarget.style.opacity='0.4';}
-function clDragEnd(e){e.currentTarget.style.opacity='1';document.querySelectorAll('[data-gid]').forEach(r=>r.style.borderTop='');}
-function clDragOver(e){e.preventDefault();e.currentTarget.style.borderTop='2px solid var(--primary)';}
-function clDrop(e,gid,toIdx){
-  e.preventDefault();
-  if(_clDragIdx===null||_clDragGid!==gid||_clDragIdx===toIdx)return;
-  // 同じグループ内でのみ並べ替え
-  const rows=[...document.querySelectorAll(`#${gid} tr[data-id]`)];
-  const ids=rows.map(r=>r.dataset.id);
-  const moved=ids.splice(_clDragIdx,1)[0];
-  ids.splice(toIdx,0,moved);
-  // sort_orderをSupabaseに保存
-  ids.forEach((id,i)=>{
-    const m=db.cleaning_masters.find(x=>x.id===id);
-    if(m){m.sort_order=i;sbFetch('cleaning_masters?id=eq.'+id,'PATCH',{sort_order:i});}
-  });
-  // db.cleaning_mastersの順番も更新
-  const reordered=ids.map(id=>db.cleaning_masters.find(m=>m.id===id)).filter(Boolean);
-  reordered.forEach((m,i)=>{
-    const dbIdx=db.cleaning_masters.findIndex(x=>x.id===m.id);
-    if(dbIdx>=0)db.cleaning_masters[dbIdx].sort_order=i;
-  });
-  _clDragIdx=null;_clDragGid=null;
+function getGroupParents(storeName,dateKey){
+  const sids=clVisIds();
+  const masters=db.cleaning_masters.filter(m=>sids.includes(m.store_id)&&!m.parent_id).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
+  return masters.filter(m=>(m.reg_store||'未設定')===storeName&&(m.closing_date||'未設定')===dateKey);
+}
+async function clMoveUp(id,storeName,dateKey){
+  const group=getGroupParents(storeName,dateKey);
+  const idx=group.findIndex(m=>m.id===id);
+  if(idx<=0)return;
+  [group[idx-1].sort_order,group[idx].sort_order]=[group[idx].sort_order,group[idx-1].sort_order];
+  await Promise.all([
+    sbFetch('cleaning_masters?id=eq.'+group[idx-1].id,'PATCH',{sort_order:group[idx-1].sort_order}),
+    sbFetch('cleaning_masters?id=eq.'+group[idx].id,'PATCH',{sort_order:group[idx].sort_order})
+  ]);
   renderCleaningMasters();
-  toast('並び順を保存しました');
+}
+async function clMoveDown(id,storeName,dateKey){
+  const group=getGroupParents(storeName,dateKey);
+  const idx=group.findIndex(m=>m.id===id);
+  if(idx<0||idx>=group.length-1)return;
+  [group[idx].sort_order,group[idx+1].sort_order]=[group[idx+1].sort_order,group[idx].sort_order];
+  await Promise.all([
+    sbFetch('cleaning_masters?id=eq.'+group[idx].id,'PATCH',{sort_order:group[idx].sort_order}),
+    sbFetch('cleaning_masters?id=eq.'+group[idx+1].id,'PATCH',{sort_order:group[idx+1].sort_order})
+  ]);
+  renderCleaningMasters();
 }
 
 function openCleaningMasterModal(id){
