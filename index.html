@@ -1474,6 +1474,7 @@ function renderCleaningMonthly(){
   const recs={};db.cleaning_monthly.filter(r=>r.month===month&&sids.includes(r.store_id)).forEach(r=>recs[r.master_id]=r);
   const parents=masters.filter(m=>!m.parent_id);
   const childMap={};masters.filter(m=>m.parent_id).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)||(a.id||'').localeCompare(b.id||'')).forEach(m=>{if(!childMap[m.parent_id])childMap[m.parent_id]=[];childMap[m.parent_id].push(m);});
+
   // 登録店ごとにグループ化
   const storeGroups={};const storeOrder=[];
   parents.forEach(p=>{
@@ -1481,20 +1482,44 @@ function renderCleaningMonthly(){
     if(!storeGroups[st]){storeGroups[st]=[];storeOrder.push(st);}
     storeGroups[st].push(p);
   });
+
   const rowHtml=(m,isChild)=>{
-    const r=recs[m.id];const t=m.contract_type||'定額';
-    const isFixed=t==='定額';const isManual=t==='スポット'||t==='その他売上'||t==='商品売上';
-    const defCount=isFixed?1:0;
+    const r=recs[m.id];
+    const t=m.contract_type||'定額';
+    const isService=t==='定額'||t==='回数制'||t==='スポット';
+    const isOther=t==='その他売上';
+    const isGoods=t==='商品売上';
+    const isManual=isOther||isGoods;
+
+    // 単価（マスタから、または上書き）
+    const unitPrice=r&&r.unit_price_override!=null?Number(r.unit_price_override):Number(m.unit_price||0);
+    // 回数
+    const defCount=(t==='定額')?1:0;
     const count=r?Number(r.count)||0:defCount;
-    const base=r&&r.amount_override!=null?Number(r.amount_override):Math.round(Number(m.unit_price||0)*count);
+    // 実績
+    const base=r&&r.amount_override!=null?Number(r.amount_override):(isManual?0:Math.round(unitPrice*count));
     const tax=Math.floor(base*0.1);
     const style=CL_TYPE_STYLE[t]||'';
-    const countCell=isFixed?`<span style="font-family:'DM Mono',monospace;">1</span>`:`<input type="number" class="cl-input" id="cln-${m.id}" value="${count}" min="0" oninput="calcClRow('${m.id}',${Number(m.unit_price||0)},this.value)">`;
-    const baseCell=isManual?`<input type="number" class="cl-amtinput" id="clb-${m.id}" value="${base||''}" min="0" oninput="calcClRowBase('${m.id}',this.value)">`:`<span id="clb-${m.id}" class="cl-mono">${base?fy(base):''}</span>`;
+
+    // 回数入力（定額・スポット・回数制すべて手打ち可）
+    const countCell=isManual
+      ?'<span style="color:#ccc">—</span>'
+      :`<input type="number" class="cl-input" id="cln-${m.id}" value="${count}" min="0" oninput="calcClRowAuto('${m.id}',this.value,null)">`;
+
+    // 単価入力（定額・スポット・回数制は上書き可）
+    const unitCell=isManual
+      ?'<span style="color:#ccc">—</span>'
+      :`<input type="number" class="cl-input" id="clu-${m.id}" value="${unitPrice||''}" min="0" placeholder="${m.unit_price||''}" oninput="calcClRowAuto('${m.id}',null,this.value)">`;
+
+    // 実績（自動計算の場合は表示のみ、手打ちの場合は入力可）
+    const baseCell=isManual
+      ?`<input type="number" class="cl-amtinput" id="clb-${m.id}" value="${base||''}" min="0" oninput="calcClRowBase('${m.id}',this.value)">`
+      :`<span id="clb-${m.id}" class="cl-mono">${base?fy(base):''}</span>`;
+
     return`<tr class="${isChild?'cl-child':'cl-parent'}" data-mid="${m.id}">
       <td>${isChild?'〃 ':''}${m.name}${m.contract_no?` <span style="font-size:10px;color:var(--text3)">${m.contract_no}</span>`:''}${m.note?`<div style="font-size:10px;color:var(--yellow);margin-top:1px;">${m.note}</div>`:''}</td>
       <td><span class="cl-ttag" style="${style}">${t}</span></td>
-      <td class="cl-mono">${m.unit_price?fy(Number(m.unit_price)):''}</td>
+      <td class="cl-mono">${unitCell}</td>
       <td style="text-align:right">${countCell}</td>
       <td>${baseCell}</td>
       <td class="cl-mono" id="clt-${m.id}">${tax?fy(tax):''}</td>
@@ -1502,11 +1527,13 @@ function renderCleaningMonthly(){
       <td><input type="text" class="cl-noteinput" id="clnote-${m.id}" value="${(r&&r.note)||''}" placeholder="備考"></td>
     </tr>`;
   };
-  let grandBase=0;
+
+  let grandSvc=0,grandOther=0,grandGoods=0;
+  let cntTeiki=0,cntSpot=0;
   let html='<div style="overflow-x:auto">';
+
   storeOrder.forEach(storeName=>{
     const storeParents=storeGroups[storeName];
-    // 締日ごとにグループ化
     const dateGroups={};const dateOrder=[];
     storeParents.forEach(p=>{
       const cd=p.closing_date||'未設定';
@@ -1517,40 +1544,93 @@ function renderCleaningMonthly(){
     let storeBase=0;
     html+=`<div style="margin-bottom:20px;">
       <div style="background:var(--bg3);border-radius:8px 8px 0 0;padding:8px 14px;font-weight:700;font-size:14px;border-bottom:2px solid var(--primary);">🏪 ${storeName}</div>`;
+
     dateOrder.forEach(dateKey=>{
       const dateParents=dateGroups[dateKey];
       let dateBase=0;
       html+=`<table class="cl-table"><thead><tr>
         <th colspan="8" style="background:var(--bg2);text-align:left;padding:6px 12px;font-size:12px;color:var(--text2);">📅 ${dateKey}締め</th>
       </tr><tr><th style="min-width:200px">顧客名</th><th>種別</th><th class="cl-mono">単価(税抜)</th><th class="cl-mono">回数</th><th class="cl-mono" style="min-width:110px">実績(税抜)</th><th class="cl-mono">消費税</th><th class="cl-mono">税込合計</th><th>備考</th></tr></thead><tbody>`;
+
       dateParents.forEach(p=>{
         html+=rowHtml(p,false);
         (childMap[p.id]||[]).forEach(c=>{html+=rowHtml(c,true);});
-        const r=recs[p.id];const t=p.contract_type||'定額';const isFixed=t==='定額';
-        const count=r?Number(r.count)||0:(isFixed?1:0);
-        const base=r&&r.amount_override!=null?Number(r.amount_override):Math.round(Number(p.unit_price||0)*count);
+
+        // 集計（親のみカウント）
+        const t=p.contract_type||'定額';
+        const r=recs[p.id];
+        const unitPrice=r&&r.unit_price_override!=null?Number(r.unit_price_override):Number(p.unit_price||0);
+        const defCount=(t==='定額')?1:0;
+        const count=r?Number(r.count)||0:defCount;
+        const base=r&&r.amount_override!=null?Number(r.amount_override):Math.round(unitPrice*count);
+
+        if(t==='定額'||t==='回数制'||t==='スポット'){grandSvc+=base;}
+        else if(t==='その他売上'){grandOther+=base;}
+        else if(t==='商品売上'){grandGoods+=base;}
         dateBase+=base;
-        (childMap[p.id]||[]).forEach(c=>{const cr=recs[c.id];const ct=c.contract_type||'定額';const isC=ct==='定額';const cc=cr?Number(cr.count)||0:(isC?1:0);const cb=cr&&cr.amount_override!=null?Number(cr.amount_override):Math.round(Number(c.unit_price||0)*cc);dateBase+=cb;});
+
+        // 子契約も売上に加算
+        (childMap[p.id]||[]).forEach(c=>{
+          const ct=c.contract_type||'定額';
+          const cr=recs[c.id];
+          const cu=cr&&cr.unit_price_override!=null?Number(cr.unit_price_override):Number(c.unit_price||0);
+          const cc=cr?Number(cr.count)||0:(ct==='定額'?1:0);
+          const cb=cr&&cr.amount_override!=null?Number(cr.amount_override):Math.round(cu*cc);
+          if(ct==='定額'||ct==='回数制'||ct==='スポット'){grandSvc+=cb;}
+          else if(ct==='その他売上'){grandOther+=cb;}
+          else if(ct==='商品売上'){grandGoods+=cb;}
+          dateBase+=cb;
+        });
+
+        // 件数カウント（親のみ）
+        if(t==='定額'||t==='回数制')cntTeiki++;
+        else if(t==='スポット')cntSpot++;
       });
+
       const dateTax=Math.floor(dateBase*0.1);
       storeBase+=dateBase;
       html+=`<tr class="cl-sum"><td colspan="4" style="text-align:left;">📅 ${dateKey}締め 小計</td><td class="cl-mono">${fy(dateBase)}</td><td class="cl-mono">${fy(dateTax)}</td><td class="cl-mono">${fy(dateBase+dateTax)}</td><td></td></tr>`;
       html+=`</tbody></table>`;
     });
+
     const storeTax=Math.floor(storeBase*0.1);
-    grandBase+=storeBase;
     html+=`<div style="background:var(--bg2);padding:8px 14px;font-weight:700;font-size:13px;text-align:right;border-top:2px solid var(--border);">🏪 ${storeName} 合計：税抜 ${fy(storeBase)}　税 ${fy(storeTax)}　税込 ${fy(storeBase+storeTax)}</div>
     </div>`;
   });
-  const gt=Math.floor(grandBase*0.1);
-  html+=`<div style="margin-top:8px;padding:12px 16px;background:rgba(29,110,90,.08);border:1px solid rgba(29,110,90,.2);border-radius:10px;font-size:13px;">
-    📊 全合計 税抜: <strong style="font-family:'DM Mono',monospace;font-size:15px;">${fy(grandBase)}</strong>　消費税: ${fy(gt)}　税込: ${fy(grandBase+gt)}<br>
-    <span style="font-size:11px;color:var(--text2);">→ 月間運営報告の「売上実績」に「一括保存」後に自動上乗せされます</span>
+
+  const gt=Math.floor((grandSvc+grandOther+grandGoods)*0.1);
+  const grandTotal=grandSvc+grandOther+grandGoods;
+  html+=`<div style="margin-top:12px;padding:14px 16px;background:rgba(29,110,90,.08);border:1px solid rgba(29,110,90,.2);border-radius:10px;">
+    <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:10px;font-size:13px;">
+      <div>🔧 <strong>サービス売上</strong>　税抜 <span style="font-family:'DM Mono',monospace;">${fy(grandSvc)}</span></div>
+      <div>📦 <strong>その他売上</strong>　税抜 <span style="font-family:'DM Mono',monospace;">${fy(grandOther)}</span></div>
+      <div>🛍️ <strong>商品売上</strong>　税抜 <span style="font-family:'DM Mono',monospace;">${fy(grandGoods)}</span></div>
+    </div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:10px;font-size:13px;">
+      <div>📋 <strong>定期件数</strong>：${cntTeiki}件</div>
+      <div>✨ <strong>スポット件数</strong>：${cntSpot}件</div>
+    </div>
+    <div style="font-size:14px;">📊 <strong>全合計</strong>　税抜 <strong style="font-family:'DM Mono',monospace;font-size:16px;">${fy(grandTotal)}</strong>　消費税 ${fy(gt)}　税込 ${fy(grandTotal+gt)}</div>
+    <div style="font-size:11px;color:var(--text2);margin-top:4px;">→ 月間運営報告の「売上実績」に「一括保存」後に自動上乗せされます</div>
   </div>`;
   html+='</div>';
   body.innerHTML=html;
 }
 
+function calcClRowAuto(mid, countVal, unitVal){
+  const countEl=document.getElementById('cln-'+mid);
+  const unitEl=document.getElementById('clu-'+mid);
+  const count=countVal!==null?Number(countVal):(countEl?Number(countEl.value)||0:0);
+  const unit=unitVal!==null?Number(unitVal):(unitEl?Number(unitEl.value)||0:0);
+  const base=Math.round(count*unit);
+  const tax=Math.floor(base*0.1);
+  const baseEl=document.getElementById('clb-'+mid);
+  const taxEl=document.getElementById('clt-'+mid);
+  const hEl=document.getElementById('clh-'+mid);
+  if(baseEl)baseEl.textContent=base?fy(base):'';
+  if(taxEl)taxEl.textContent=tax?fy(tax):'';
+  if(hEl)hEl.textContent=(base+tax)?fy(base+tax):'';
+}
 function calcClRow(mid,unitPrice,countVal){const count=Number(countVal)||0;const base=Math.round(unitPrice*count);const tax=Math.floor(base*0.1);const be=document.getElementById('clb-'+mid);if(be&&be.tagName!=='INPUT')be.textContent=base?fy(base):'';document.getElementById('clt-'+mid).textContent=tax?fy(tax):'';document.getElementById('clh-'+mid).textContent=(base+tax)?fy(base+tax):'';}
 function calcClRowBase(mid,val){const base=Number(val)||0;const tax=Math.floor(base*0.1);document.getElementById('clt-'+mid).textContent=tax?fy(tax):'';document.getElementById('clh-'+mid).textContent=(base+tax)?fy(base+tax):'';}
 async function saveAllCleaningMonthly(){
@@ -1558,12 +1638,19 @@ async function saveAllCleaningMonthly(){
   const sids=clVisIds();
   const masters=db.cleaning_masters.filter(m=>sids.includes(m.store_id)&&m.active!==false);
   for(const m of masters){
-    const t=m.contract_type||'定額';const isFixed=t==='定額';const isManual=t==='スポット'||t==='その他売上'||t==='商品売上';
-    const count=isFixed?1:Number(document.getElementById('cln-'+m.id)?.value||0);
+    const t=m.contract_type||'定額';
+    const isManual=t==='その他売上'||t==='商品売上';
+    // 回数
+    const countEl=document.getElementById('cln-'+m.id);
+    const count=countEl?Number(countEl.value)||0:(t==='定額'?1:0);
+    // 単価上書き
+    const unitEl=document.getElementById('clu-'+m.id);
+    const unitOverride=unitEl&&Number(unitEl.value)!==Number(m.unit_price||0)?Number(unitEl.value):null;
+    // 実績上書き（手打ち系のみ）
     let amountOverride=null;
     if(isManual){const el=document.getElementById('clb-'+m.id);if(el)amountOverride=Number(el.value)||0;}
     const note=document.getElementById('clnote-'+m.id)?.value||'';
-    const rec={master_id:m.id,store_id:m.store_id,month,count,amount_override:amountOverride,note};
+    const rec={master_id:m.id,store_id:m.store_id,month,count,unit_price_override:unitOverride,amount_override:amountOverride,note};
     const existing=db.cleaning_monthly.find(r=>r.master_id===m.id&&r.month===month);
     if(existing){await sbUpdate('cleaning_monthly','id=eq.'+existing.id,rec);Object.assign(existing,rec);}
     else{const nr={...rec,id:uid()};const res=await sbInsert('cleaning_monthly',nr);if(res!==null)db.cleaning_monthly.push(nr);}
