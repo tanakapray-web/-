@@ -634,7 +634,7 @@ async function loadDB(){
       sbGet('daily','order=date.desc'),
       sbGet('monthly','order=month.desc'),
       sbGet('cats','id=eq.1'),
-      sbGet('cleaning_masters','order=sort_order'),
+      sbGet('cleaning_masters','order=sort_order,id'),
       sbGet('cleaning_monthly','')
     ]);
     db.stores=stores||[];
@@ -1453,7 +1453,7 @@ function clVisIds(){
 }
 function getCleaningTotal(storeId,month){if(!db.cleaning_masters||!db.cleaning_monthly)return 0;const masters=db.cleaning_masters.filter(m=>m.store_id===storeId&&m.active!==false);const recs={};db.cleaning_monthly.filter(r=>r.month===month&&r.store_id===storeId).forEach(r=>recs[r.master_id]=r);return masters.reduce((sum,m)=>{const r=recs[m.id];const t=m.contract_type||'定額';const count=r?Number(r.count)||0:(t==='定額'?1:0);return sum+(r&&r.amount_override!=null?Number(r.amount_override):Math.round(Number(m.unit_price||0)*count));},0);}
 async function initCleaningPage(){
-  try{const[ms,mo]=await Promise.all([sbGet('cleaning_masters','order=sort_order'),sbGet('cleaning_monthly','')]);db.cleaning_masters=ms||[];db.cleaning_monthly=mo||[];}catch(e){db.cleaning_masters=db.cleaning_masters||[];db.cleaning_monthly=db.cleaning_monthly||[];}
+  try{const[ms,mo]=await Promise.all([sbGet('cleaning_masters','order=sort_order,id'),sbGet('cleaning_monthly','')]);db.cleaning_masters=ms||[];db.cleaning_monthly=mo||[];}catch(e){db.cleaning_masters=db.cleaning_masters||[];db.cleaning_monthly=db.cleaning_monthly||[];}
   if(!document.getElementById('cl-month').value)document.getElementById('cl-month').value=thisMonth();
   showCleaningTab('monthly');
 }
@@ -1473,7 +1473,7 @@ function renderCleaningMonthly(){
   if(!masters.length){body.innerHTML='<p style="color:var(--text2);padding:16px 0;">顧客が登録されていません。「マスタ管理」から追加してください。</p>';return;}
   const recs={};db.cleaning_monthly.filter(r=>r.month===month&&sids.includes(r.store_id)).forEach(r=>recs[r.master_id]=r);
   const parents=masters.filter(m=>!m.parent_id);
-  const childMap={};masters.filter(m=>m.parent_id).forEach(m=>{if(!childMap[m.parent_id])childMap[m.parent_id]=[];childMap[m.parent_id].push(m);});
+  const childMap={};masters.filter(m=>m.parent_id).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)||(a.id||'').localeCompare(b.id||'')).forEach(m=>{if(!childMap[m.parent_id])childMap[m.parent_id]=[];childMap[m.parent_id].push(m);});
   // 登録店ごとにグループ化
   const storeGroups={};const storeOrder=[];
   parents.forEach(p=>{
@@ -1513,6 +1513,7 @@ function renderCleaningMonthly(){
       if(!dateGroups[cd]){dateGroups[cd]=[];dateOrder.push(cd);}
       dateGroups[cd].push(p);
     });
+    dateOrder.sort(sortClosingDate);
     let storeBase=0;
     html+=`<div style="margin-bottom:20px;">
       <div style="background:var(--bg3);border-radius:8px 8px 0 0;padding:8px 14px;font-weight:700;font-size:14px;border-bottom:2px solid var(--primary);">🏪 ${storeName}</div>`;
@@ -1569,13 +1570,17 @@ async function saveAllCleaningMonthly(){
   }
   toast(`${masters.length}件 保存しました`);renderCleaningMonthly();
 }
+function sortClosingDate(a,b){
+  const toNum=d=>{const m=d.match(/\d+/);return m?Number(m[0]):(d.includes('末')||d.includes('月末')?99:100);};
+  return toNum(a)-toNum(b);
+}
 function renderCleaningMasters(){
   const sids=clVisIds();
   const masters=db.cleaning_masters.filter(m=>sids.includes(m.store_id));
   const body=document.getElementById('cl-masters-body');
   if(!masters.length){body.innerHTML='<p style="color:var(--text2);">顧客が登録されていません。</p>';return;}
   const parents=masters.filter(m=>!m.parent_id).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0));
-  const childMap={};masters.filter(m=>m.parent_id).forEach(m=>{if(!childMap[m.parent_id])childMap[m.parent_id]=[];childMap[m.parent_id].push(m);});
+  const childMap={};masters.filter(m=>m.parent_id).sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)||(a.id||'').localeCompare(b.id||'')).forEach(m=>{if(!childMap[m.parent_id])childMap[m.parent_id]=[];childMap[m.parent_id].push(m);});
   const storeGroups={};const storeOrder=[];
   parents.forEach(p=>{
     const st=p.reg_store||'未設定';
@@ -1591,6 +1596,7 @@ function renderCleaningMasters(){
       if(!dateGroups[cd]){dateGroups[cd]=[];dateOrder.push(cd);}
       dateGroups[cd].push(p);
     });
+    dateOrder.sort(sortClosingDate);
     html+=`<div style="margin-bottom:20px;">
       <div style="background:var(--bg3);border-radius:8px 8px 0 0;padding:8px 14px;font-weight:700;font-size:14px;border-bottom:2px solid var(--primary);">🏪 ${storeName}</div>`;
     dateOrder.forEach(dateKey=>{
