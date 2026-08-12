@@ -2159,7 +2159,11 @@ function updStoreHidden(){
 
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 function closePrintModal(){document.getElementById('print-modal').classList.remove('open');}
-['print-modal','store-modal','user-modal','cleaning-master-modal','sales-edit-modal'].forEach(id=>{document.getElementById(id).addEventListener('click',function(e){if(e.target===this){if(id==='print-modal')closePrintModal();else closeModal(id);}});});
+let _salesModalDragStart=null,_salesModalDragging=false;
+document.addEventListener('mousedown',e=>{_salesModalDragStart={x:e.clientX,y:e.clientY};_salesModalDragging=false;});
+document.addEventListener('mousemove',e=>{if(_salesModalDragStart&&(Math.abs(e.clientX-_salesModalDragStart.x)>5||Math.abs(e.clientY-_salesModalDragStart.y)>5))_salesModalDragging=true;});
+document.addEventListener('mouseup',()=>{setTimeout(()=>{_salesModalDragging=false;_salesModalDragStart=null;},100);});
+['print-modal','store-modal','user-modal','cleaning-master-modal','sales-edit-modal'].forEach(id=>{document.getElementById(id).addEventListener('click',function(e){if(e.target===this&&!_salesModalDragging){if(id==='print-modal')closePrintModal();else closeModal(id);}});});
 
 (async()=>{showLoading(true);const restored=await tryRestore();showLoading(false);if(restored)startApp();})();
 </script>
