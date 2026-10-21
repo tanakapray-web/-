@@ -1287,7 +1287,14 @@ async function loadScheduleSales(month, allStores=false){
     if(storeIds.length===1)query+=`&store_id=eq.${storeIds[0]}`;
   }
   const res=await sbGet('schedules',query);
-  return (res||[]).filter(s=>s.name&&!['休み','×','ＰＭ休み'].includes(s.name));
+  const filtered=(res||[]).filter(s=>s.name&&!['休み','×','ＰＭ休み'].includes(s.name));
+  // 同じ日付・店舗・顧客名の重複エントリを除外（複数チーフが同じ顧客をチェックしたとき用）
+  const seen=new Set();
+  return filtered.filter(s=>{
+    const key=`${s.date}__${s.store_id}__${s.name}`;
+    if(seen.has(key))return false;
+    seen.add(key);return true;
+  });
 }
 
 async function renderSalesList(){
