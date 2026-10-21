@@ -289,6 +289,8 @@ tbody td{padding:10px 12px;color:var(--text);}
             </div>
             <button class="btn btn-success btn-sm" onclick="importFromSchedule()">↓ 読み込む</button>
           </div>
+          <!-- 顧客名候補リスト（スケジュールから生成） -->
+          <datalist id="customer-names-list"></datalist>
           <div style="overflow-x:auto;">
             <table class="itbl"><thead><tr>
               <th style="width:26px">#</th><th style="min-width:100px">顧客名</th><th style="width:60px">開始</th><th style="width:60px">終了</th><th style="width:46px">実働h</th><th style="width:36px">社員</th><th style="width:36px">PA</th><th style="width:80px">区分</th><th style="min-width:90px">サービス内容</th><th style="width:36px">完了</th><th style="width:84px">売上(税抜)</th><th style="width:84px">入金(税込)</th><th style="width:84px">売掛(税込)</th><th style="width:84px">その他売上</th><th style="width:84px">商品売上</th><th style="min-width:100px">スポット経路</th><th style="width:28px"></th>
@@ -299,7 +301,15 @@ tbody td{padding:10px 12px;color:var(--text);}
         </div>
 
         <div class="form-section">
-          <div class="form-section-title">ST（外注委託）取引内訳</div>
+          <div class="form-section-title">ST（外注委託）取引内訳 <span class="sched-badge">スケジュールから自動読込</span></div>
+          <!-- ST読込バー -->
+          <div id="st-import-bar" class="sched-import-bar" style="display:none;">
+            <div>
+              <div class="sched-import-info">👷 STスタッフが見つかりました</div>
+              <div class="sched-import-count" id="st-import-count"></div>
+            </div>
+            <button class="btn btn-success btn-sm" onclick="importST()">↓ 読み込む</button>
+          </div>
           <div style="overflow-x:auto;">
             <table class="itbl"><thead><tr>
               <th style="width:26px">#</th><th style="min-width:100px">ST名・会社名</th><th style="min-width:90px">作業内容</th><th style="width:60px">開始</th><th style="width:60px">終了</th><th style="width:46px">実働h</th><th style="width:84px">支払額(税抜)</th><th style="width:84px">支払額(税込)</th><th style="min-width:80px">備考</th><th style="width:28px"></th>
@@ -310,7 +320,15 @@ tbody td{padding:10px 12px;color:var(--text);}
         </div>
 
         <div class="form-section">
-          <div class="form-section-title">パート・アルバイト 勤務管理</div>
+          <div class="form-section-title">パート・アルバイト 勤務管理 <span class="sched-badge">スケジュールから自動読込</span></div>
+          <!-- パート読込バー -->
+          <div id="part-import-bar" class="sched-import-bar" style="display:none;">
+            <div>
+              <div class="sched-import-info">🧑‍🤝‍🧑 出勤予定のスタッフが見つかりました</div>
+              <div class="sched-import-count" id="part-import-count"></div>
+            </div>
+            <button class="btn btn-success btn-sm" onclick="importPart()">↓ 読み込む</button>
+          </div>
           <div style="overflow-x:auto;">
             <table class="itbl"><thead><tr>
               <th style="width:26px">#</th><th style="min-width:90px">氏名</th><th style="min-width:100px">顧客先（現場）</th><th style="width:60px">出勤</th><th style="width:60px">退勤</th><th style="width:46px">実働h</th><th style="width:80px">日給(円)</th><th style="width:80px">交通費(円)</th><th style="width:80px">合計人件費</th><th style="min-width:70px">備考</th><th style="width:28px"></th>
@@ -623,6 +641,8 @@ const DEF_ROUTES=['DH','コールセンター','リピート','リコール','�
 let db={stores:[],users:[],daily:[],monthly:[],cats:{service:[...DEF_CATS],route:[...DEF_ROUTES],division:[]},cleaning_masters:[],cleaning_monthly:[],sales_overrides:[]};
 let currentUser=null,activeStoreFilter='all',activeInputStore='';
 let pendingSchedules=[]; // スケジュールから読み込んだデータ一時保存
+let pendingSTChiefs=[]; // STスタッフ一時保存
+let pendingPartStaff=[]; // パート出勤予定一時保存
 let editingDailyId=null; // 編集中の日報ID（nullなら新規作成）
 
 async function loadDB(){
@@ -1031,6 +1051,8 @@ function editDailyReport(id){
     if(!document.getElementById('part-tbody').children.length)addPartRow();
     updSales();updST();updPart();
     document.getElementById('sched-import-bar').style.display='none';
+    document.getElementById('st-import-bar').style.display='none';
+    document.getElementById('part-import-bar').style.display='none';
     const banner=document.getElementById('daily-edit-banner');
     if(banner)banner.style.display='flex';
   },100);
@@ -1054,25 +1076,65 @@ function initDailyForm(){
 // ===== スケジュール自動読込 =====
 async function loadScheduleForDate(){
   const date=document.getElementById('d-date').value;
-  if(!date){document.getElementById('sched-import-bar').style.display='none';return;}
+  const hideAll=()=>{
+    document.getElementById('sched-import-bar').style.display='none';
+    document.getElementById('st-import-bar').style.display='none';
+    document.getElementById('part-import-bar').style.display='none';
+  };
+  if(!date){hideAll();return;}
 
   // 右上「入力:」で選択中の店舗を使う
   const storeId=inputStoreId();
-  if(!storeId){document.getElementById('sched-import-bar').style.display='none';return;}
+  if(!storeId){hideAll();return;}
 
-  // 選択店舗 + 日付で絞り込み
-  const res=await sbGet('schedules',`date=eq.${date}&store_id=eq.${storeId}&select=*&order=start_time`);
-  pendingSchedules=(res||[]);
+  // 並列で3つのデータを取得
+  const month=date.slice(0,7);
+  const [schedRes, stRes, staffListRes, attRes] = await Promise.all([
+    sbGet('schedules',`date=eq.${date}&store_id=eq.${storeId}&select=*&order=start_time`),
+    sbGet('schedule_staff',`store_id=eq.${storeId}&type=eq.chief&is_st=eq.true&order=sort_order`),
+    sbGet('schedule_staff',`store_id=eq.${storeId}&type=eq.staff&order=sort_order`),
+    sbGet('schedule_attendance',`store_id=eq.${storeId}&month=eq.${month}`)
+  ]);
 
-  // 休み・不要な名前を除外
+  // ── サービス実績（顧客名）──
+  pendingSchedules=(schedRes||[]);
   pendingSchedules=pendingSchedules.filter(s=>s.name&&!['休み','×','ＰＭ休み'].includes(s.name));
-  // サービス予定だけ（区分未設定の旧データは取り込む）
   pendingSchedules=pendingSchedules.filter(s=>!s.schedule_type||s.schedule_type==='service');
 
-  if(!pendingSchedules.length){document.getElementById('sched-import-bar').style.display='none';return;}
+  if(pendingSchedules.length){
+    document.getElementById('sched-import-count').textContent=`${pendingSchedules.length}件の現場予定が見つかりました（再読み込み可）`;
+    document.getElementById('sched-import-bar').style.display='flex';
+  } else {
+    document.getElementById('sched-import-bar').style.display='none';
+  }
 
-  document.getElementById('sched-import-count').textContent=`${pendingSchedules.length}件の現場予定が見つかりました（再読み込み可）`;
-  document.getElementById('sched-import-bar').style.display='flex';
+  // 顧客名datalistを更新
+  const dl=document.getElementById('customer-names-list');
+  if(dl){
+    const names=[...new Set(pendingSchedules.map(s=>s.name).filter(Boolean))];
+    dl.innerHTML=names.map(n=>`<option value="${n.replace(/"/g,'&quot;')}">`).join('');
+  }
+
+  // ── ST（外注委託）──
+  pendingSTChiefs=(stRes||[]);
+  if(pendingSTChiefs.length){
+    document.getElementById('st-import-count').textContent=`${pendingSTChiefs.length}名のSTスタッフが登録されています（再読み込み可）`;
+    document.getElementById('st-import-bar').style.display='flex';
+  } else {
+    document.getElementById('st-import-bar').style.display='none';
+  }
+
+  // ── パート・アルバイト（出勤予定者）──
+  const staffList=staffListRes||[];
+  const attData=((attRes||[])[0]&&attRes[0].data)||{};
+  pendingPartStaff=staffList.filter((_,si)=>attData[`${date}__${si}`]==='出勤');
+
+  if(pendingPartStaff.length){
+    document.getElementById('part-import-count').textContent=`${pendingPartStaff.length}名が出勤予定です（再読み込み可）`;
+    document.getElementById('part-import-bar').style.display='flex';
+  } else {
+    document.getElementById('part-import-bar').style.display='none';
+  }
 }
 
 function importFromSchedule(){
@@ -1099,13 +1161,44 @@ function importFromSchedule(){
   toast(`${cnt}件のスケジュールを読み込みました`);
 }
 
+function importST(){
+  if(!pendingSTChiefs.length)return;
+  // 既存のST名行をクリア（空行は残してOK、名前がある行は一旦すべて消してリセット）
+  const tbody=document.getElementById('st-tbody');
+  // 既存の空行だけ削除
+  [...tbody.querySelectorAll('tr')].forEach(tr=>{const i=tr.querySelectorAll('input');if(i[0]&&!i[0].value.trim())tr.remove();});
+  // 既に同名のST行があれば重複しない
+  const existingNames=[...tbody.querySelectorAll('tr')].map(tr=>{const i=tr.querySelectorAll('input');return i[0]?i[0].value.trim():'';});
+  const toAdd=pendingSTChiefs.filter(s=>!existingNames.includes(s.name));
+  toAdd.forEach(s=>addSTRowWithData({name:s.name}));
+  updST();
+  const cnt=pendingSTChiefs.length;
+  document.getElementById('st-import-count').textContent=`${cnt}名読み込み済み（再度押すと再読み込み）`;
+  toast(`${cnt}名のSTスタッフを読み込みました`);
+}
+
+function importPart(){
+  if(!pendingPartStaff.length)return;
+  const tbody=document.getElementById('part-tbody');
+  // 空行を削除
+  [...tbody.querySelectorAll('tr')].forEach(tr=>{const i=tr.querySelectorAll('input');if(i[0]&&!i[0].value.trim())tr.remove();});
+  // 重複しないように名前チェック
+  const existingNames=[...tbody.querySelectorAll('tr')].map(tr=>{const i=tr.querySelectorAll('input');return i[0]?i[0].value.trim():'';});
+  const toAdd=pendingPartStaff.filter(s=>!existingNames.includes(s.name));
+  toAdd.forEach(s=>addPartRowWithData({name:s.name}));
+  updPart();
+  const cnt=pendingPartStaff.length;
+  document.getElementById('part-import-count').textContent=`${cnt}名読み込み済み（再度押すと再読み込み）`;
+  toast(`${cnt}名のパートスタッフを読み込みました`);
+}
+
 function addServiceRowWithData(data){
   rC++;
   const tr=document.createElement('tr');
   const startVal=data.startTime||'';
   const endVal=data.endTime||'';
   tr.innerHTML=`<td style="text-align:center;color:var(--text2);font-size:11px;">${rC}</td>
-    <td><input type="text" value="${data.name||''}" placeholder="顧客名" oninput="updSales()"></td>
+    <td><input type="text" list="customer-names-list" value="${data.name||''}" placeholder="顧客名" oninput="updSales()"></td>
     <td><input type="time" value="${startVal}"></td>
     <td><input type="time" value="${endVal}"></td>
     <td><input type="number" min="0" step="0.5" style="width:40px;" oninput="updSales()"></td>
@@ -1124,7 +1217,7 @@ function addServiceRowWithData(data){
   document.getElementById('service-tbody').appendChild(tr);
 }
 
-function addServiceRow(){rC++;const tr=document.createElement('tr');tr.innerHTML=`<td style="text-align:center;color:var(--text2);font-size:11px;">${rC}</td><td><input type="text" placeholder="顧客名" oninput="updSales()"></td><td><input type="time"></td><td><input type="time"></td><td><input type="number" min="0" step="0.5" style="width:40px;" oninput="updSales()"></td><td><input type="number" min="0" style="width:32px;"></td><td><input type="number" min="0" style="width:32px;"></td><td><select oninput="updSales()">${sOpts()}</select></td><td><input type="text" placeholder="内容" style="min-width:80px;"></td><td><select><option>合</option><option>否</option></select></td><td><input type="number" min="0" oninput="updSales()"></td><td><input type="number" min="0"></td><td><input type="number" min="0"></td><td><input type="number" min="0" placeholder="0" oninput="updSales()"></td><td><input type="number" min="0" placeholder="0" oninput="updSales()"></td><td><select>${rtOpts()}</select></td><td><button class="del-btn" onclick="this.closest('tr').remove();reNumberRows();updSales()">✕</button></td>`;document.getElementById('service-tbody').appendChild(tr);}
+function addServiceRow(){rC++;const tr=document.createElement('tr');tr.innerHTML=`<td style="text-align:center;color:var(--text2);font-size:11px;">${rC}</td><td><input type="text" list="customer-names-list" placeholder="顧客名" oninput="updSales()"></td><td><input type="time"></td><td><input type="time"></td><td><input type="number" min="0" step="0.5" style="width:40px;" oninput="updSales()"></td><td><input type="number" min="0" style="width:32px;"></td><td><input type="number" min="0" style="width:32px;"></td><td><select oninput="updSales()">${sOpts()}</select></td><td><input type="text" placeholder="内容" style="min-width:80px;"></td><td><select><option>合</option><option>否</option></select></td><td><input type="number" min="0" oninput="updSales()"></td><td><input type="number" min="0"></td><td><input type="number" min="0"></td><td><input type="number" min="0" placeholder="0" oninput="updSales()"></td><td><input type="number" min="0" placeholder="0" oninput="updSales()"></td><td><select>${rtOpts()}</select></td><td><button class="del-btn" onclick="this.closest('tr').remove();reNumberRows();updSales()">✕</button></td>`;document.getElementById('service-tbody').appendChild(tr);}
 function addSTRow(){stC++;const tr=document.createElement('tr');tr.innerHTML=`<td style="text-align:center;color:var(--text2);font-size:11px;">${stC}</td><td><input type="text" placeholder="ST名・会社名"></td><td><input type="text" placeholder="作業内容"></td><td><input type="time"></td><td><input type="time"></td><td><input type="number" min="0" step="0.5" style="width:40px;"></td><td><input type="number" min="0" placeholder="0" oninput="updST()"></td><td><input type="number" min="0" placeholder="0" oninput="updST()"></td><td><input type="text" placeholder="備考"></td><td><button class="del-btn" onclick="this.closest('tr').remove();updST()">✕</button></td>`;document.getElementById('st-tbody').appendChild(tr);}
 function addSTRowWithData(d){stC++;const tr=document.createElement('tr');tr.innerHTML=`<td style="text-align:center;color:var(--text2);font-size:11px;">${stC}</td><td><input type="text" value="${d.name||''}" placeholder="ST名・会社名"></td><td><input type="text" value="${d.content||''}" placeholder="作業内容"></td><td><input type="time" value="${d.startTime||''}"></td><td><input type="time" value="${d.endTime||''}"></td><td><input type="number" min="0" step="0.5" style="width:40px;" value="${d.hours||''}"></td><td><input type="number" min="0" placeholder="0" value="${d.payExTax||''}" oninput="updST()"></td><td><input type="number" min="0" placeholder="0" value="${d.payInTax||''}" oninput="updST()"></td><td><input type="text" value="${d.note||''}" placeholder="備考"></td><td><button class="del-btn" onclick="this.closest('tr').remove();updST()">✕</button></td>`;document.getElementById('st-tbody').appendChild(tr);}
 function addPartRow(){pC++;const tr=document.createElement('tr');tr.innerHTML=`<td style="text-align:center;color:var(--text2);font-size:11px;">${pC}</td><td><input type="text" placeholder="氏名" oninput="updPart()"></td><td><input type="text" placeholder="顧客先（現場）"></td><td><input type="time"></td><td><input type="time"></td><td><input type="number" min="0" step="0.5" style="width:40px;"></td><td><input type="number" min="0" placeholder="0" oninput="updPart()"></td><td><input type="number" min="0" placeholder="0" oninput="updPart()"></td><td class="part-tot-cell" style="text-align:center;font-family:'DM Mono',monospace;">¥0</td><td><input type="text" placeholder="備考"></td><td><button class="del-btn" onclick="this.closest('tr').remove();updPart()">✕</button></td>`;document.getElementById('part-tbody').appendChild(tr);}
@@ -1161,7 +1254,7 @@ async function saveDaily(){
   if(result){db.daily.unshift({...rec,storeId:rec.store_id,serviceRows:sR,stRows:stR,partRows:pR,createdAt:rec.created_at});toast('デイリーレポートを保存しました');}
   else alert('保存に失敗しました。通信状態を確認してください。');
 }
-function clearDaily(){document.getElementById('service-tbody').innerHTML='';document.getElementById('st-tbody').innerHTML='';document.getElementById('part-tbody').innerHTML='';rC=0;stC=0;pC=0;['d-visit','d-estimate','d-contract','d-tel','d-posting','d-ref'].forEach(id=>document.getElementById(id).value='0');document.getElementById('d-notes').value='';document.getElementById('sched-import-bar').style.display='none';pendingSchedules=[];document.getElementById('d-date').value='';initDailyForm();}
+function clearDaily(){document.getElementById('service-tbody').innerHTML='';document.getElementById('st-tbody').innerHTML='';document.getElementById('part-tbody').innerHTML='';rC=0;stC=0;pC=0;['d-visit','d-estimate','d-contract','d-tel','d-posting','d-ref'].forEach(id=>document.getElementById(id).value='0');document.getElementById('d-notes').value='';document.getElementById('sched-import-bar').style.display='none';document.getElementById('st-import-bar').style.display='none';document.getElementById('part-import-bar').style.display='none';pendingSchedules=[];pendingSTChiefs=[];pendingPartStaff=[];const dl=document.getElementById('customer-names-list');if(dl)dl.innerHTML='';document.getElementById('d-date').value='';initDailyForm();}
 
 // MONTHLY
 function initMonthlyForm(){if(!document.getElementById('mr-month').value)document.getElementById('mr-month').value=thisMonth();if(!document.getElementById('mr-report-date').value)document.getElementById('mr-report-date').value=today();document.getElementById('mr-manager').value=currentUser.name;document.getElementById('mr-store').value=inputStoreName();autoFillMonthly();}
